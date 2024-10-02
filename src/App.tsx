@@ -69,7 +69,7 @@ const App: React.FC = () => {
 
   // Refs for scroll position and target
   const scrollPositionRef = useRef<number>(0);
-  const scrollTargetRef = useRef<number>(0);
+  const scrollTargetRef = useRef<number>(0.01); // Start with a small value to kickstart scrolling
 
   // Refs for path and rotations
   const pathRef = useRef<BABYLON.Vector3[]>([]);
@@ -169,6 +169,71 @@ const App: React.FC = () => {
     let gsMesh: BABYLON.AbstractMesh | null = null;
     let isComponentMounted = true; // Flag to check if component is still mounted
 
+    // Function to add hover interaction
+    const addHoverInteraction = (mesh: BABYLON.AbstractMesh) => {
+      mesh.actionManager = new BABYLON.ActionManager(scene);
+
+      let tooltip: HTMLDivElement | null = null;
+      let pointerMoveHandler: ((evt: PointerEvent) => void) | null = null;
+
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOverTrigger,
+          () => {
+            // Show tooltip
+            tooltip = document.createElement('div');
+            tooltip.id = 'tooltip';
+            tooltip.innerText = 'Hot spot example';
+            tooltip.style.position = 'absolute';
+            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '5px';
+            tooltip.style.borderRadius = '5px';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '15';
+            document.body.appendChild(tooltip);
+
+            pointerMoveHandler = function (evt) {
+              if (tooltip) {
+                tooltip.style.left = evt.clientX + 10 + 'px';
+                tooltip.style.top = evt.clientY + 10 + 'px';
+              }
+            };
+            window.addEventListener('pointermove', pointerMoveHandler);
+          }
+        )
+      );
+
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOutTrigger,
+          () => {
+            // Hide tooltip
+            if (tooltip) {
+              tooltip.remove();
+              tooltip = null;
+            }
+            if (pointerMoveHandler) {
+              window.removeEventListener('pointermove', pointerMoveHandler);
+              pointerMoveHandler = null;
+            }
+          }
+        )
+      );
+
+      // Cleanup when the mesh is disposed
+      mesh.onDisposeObservable.add(() => {
+        if (tooltip) {
+          tooltip.remove();
+          tooltip = null;
+        }
+        if (pointerMoveHandler) {
+          window.removeEventListener('pointermove', pointerMoveHandler);
+          pointerMoveHandler = null;
+        }
+      });
+    };
+
     // Function to load Gaussian Splatting file
     const loadSplatFile = function (fileOrUrl: File | string) {
       // Dispose of existing mesh
@@ -235,71 +300,6 @@ const App: React.FC = () => {
     if (loadedSplatUrl) {
       loadSplatFile(loadedSplatUrl);
     }
-
-    // Function to add hover interaction
-    const addHoverInteraction = (mesh: BABYLON.AbstractMesh) => {
-      mesh.actionManager = new BABYLON.ActionManager(scene);
-
-      let tooltip: HTMLDivElement | null = null;
-      let pointerMoveHandler: ((evt: PointerEvent) => void) | null = null;
-
-      mesh.actionManager.registerAction(
-        new BABYLON.ExecuteCodeAction(
-          BABYLON.ActionManager.OnPointerOverTrigger,
-          () => {
-            // Show tooltip
-            tooltip = document.createElement('div');
-            tooltip.id = 'tooltip';
-            tooltip.innerText = 'Hot spot example';
-            tooltip.style.position = 'absolute';
-            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            tooltip.style.color = 'white';
-            tooltip.style.padding = '5px';
-            tooltip.style.borderRadius = '5px';
-            tooltip.style.pointerEvents = 'none';
-            tooltip.style.zIndex = '15';
-            document.body.appendChild(tooltip);
-
-            pointerMoveHandler = function (evt) {
-              if (tooltip) {
-                tooltip.style.left = evt.clientX + 10 + 'px';
-                tooltip.style.top = evt.clientY + 10 + 'px';
-              }
-            };
-            window.addEventListener('pointermove', pointerMoveHandler);
-          }
-        )
-      );
-
-      mesh.actionManager.registerAction(
-        new BABYLON.ExecuteCodeAction(
-          BABYLON.ActionManager.OnPointerOutTrigger,
-          () => {
-            // Hide tooltip
-            if (tooltip) {
-              tooltip.remove();
-              tooltip = null;
-            }
-            if (pointerMoveHandler) {
-              window.removeEventListener('pointermove', pointerMoveHandler);
-              pointerMoveHandler = null;
-            }
-          }
-        )
-      );
-
-      // Cleanup when the mesh is disposed
-      mesh.onDisposeObservable.add(() => {
-        if (tooltip) {
-          tooltip.remove();
-          tooltip = null;
-        }
-        if (pointerMoveHandler) {
-          window.removeEventListener('pointermove', pointerMoveHandler);
-          pointerMoveHandler = null;
-        }
-      });
-    };
 
     // Drag-and-Drop Functionality
 
@@ -809,12 +809,81 @@ const App: React.FC = () => {
 
     // Variables for scroll position and target
     let scrollPosition = 0;
-    let scrollTarget = 0;
+    let scrollTarget = 0.01; // Start with a small value to enable scrolling
+
+    // Function to add hover interaction
+    const addHoverInteraction = (mesh) => {
+      mesh.actionManager = new BABYLON.ActionManager(scene);
+
+      let tooltip = null;
+      let pointerMoveHandler = null;
+
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOverTrigger,
+          () => {
+            // Show tooltip
+            tooltip = document.createElement('div');
+            tooltip.id = 'tooltip';
+            tooltip.innerText = 'Hot spot example';
+            tooltip.style.position = 'absolute';
+            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '5px';
+            tooltip.style.borderRadius = '5px';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '15';
+            document.body.appendChild(tooltip);
+
+            pointerMoveHandler = function (evt) {
+              if (tooltip) {
+                tooltip.style.left = evt.clientX + 10 + 'px';
+                tooltip.style.top = evt.clientY + 10 + 'px';
+              }
+            };
+            window.addEventListener('pointermove', pointerMoveHandler);
+          }
+        )
+      );
+
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOutTrigger,
+          () => {
+            // Hide tooltip
+            if (tooltip) {
+              tooltip.remove();
+              tooltip = null;
+            }
+            if (pointerMoveHandler) {
+              window.removeEventListener('pointermove', pointerMoveHandler);
+              pointerMoveHandler = null;
+            }
+          }
+        )
+      );
+
+      // Cleanup when the mesh is disposed
+      mesh.onDisposeObservable.add(() => {
+        if (tooltip) {
+          tooltip.remove();
+          tooltip = null;
+        }
+        if (pointerMoveHandler) {
+          window.removeEventListener('pointermove', pointerMoveHandler);
+          pointerMoveHandler = null;
+        }
+      });
+    };
 
     // Load the splat file
     BABYLON.SceneLoader.ImportMeshAsync('', '', '${splatUrl}', scene)
-      .then(() => {
-        // Scene is ready
+      .then((result) => {
+        const gsMesh = result.meshes[0];
+        gsMesh.position = BABYLON.Vector3.Zero();
+
+        // Add hover interaction
+        addHoverInteraction(gsMesh);
       })
       .catch((error) => {
         console.error('Error loading splat file:', error);
