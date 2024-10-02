@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import './App.css';
 import * as BABYLON from '@babylonjs/core';
+import { Nullable } from '@babylonjs/core/types';
 import '@babylonjs/loaders';
 import '@babylonjs/core/Loading/sceneLoader';
 
@@ -39,8 +40,11 @@ const App: React.FC = () => {
 
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -10), scene);
-    camera.rotationQuaternion = new BABYLON.Quaternion();
     camera.attachControl(canvas, true);
+
+    // Adjust camera sensitivity
+    camera.speed = 0.2; // Slows down movement speed
+    camera.angularSensibility = 4000; // Increases mouse rotation sensitivity (less sensitive)
 
     // Enable WASD keys for movement
     camera.keysUp.push(87);    // W
@@ -55,8 +59,8 @@ const App: React.FC = () => {
       if (gamepad instanceof BABYLON.GenericPad) {
         // Handle standard gamepads
         gamepad.onleftstickchanged((values) => {
-          camera.cameraDirection.z += values.y * 0.1; // Forward/backward
-          camera.cameraDirection.x += values.x * 0.1; // Left/right
+          camera.cameraDirection.z += values.y * 0.05; // Forward/backward (reduced speed)
+          camera.cameraDirection.x += values.x * 0.05; // Left/right (reduced speed)
         });
       }
     });
@@ -167,11 +171,23 @@ const App: React.FC = () => {
         evt.type === BABYLON.PointerEventTypes.POINTERMOVE
       ) {
         userControl = true;
+
+        // Switch to Euler angles (rotation) when user takes control
+        if (camera.rotationQuaternion) {
+          camera.rotation = camera.rotationQuaternion.toEulerAngles();
+          camera.rotationQuaternion = null as any; // Cast to any to avoid TypeScript error
+        }
       }
     });
 
     const keydownHandler = () => {
       userControl = true;
+
+      // Switch to Euler angles (rotation) when user takes control
+      if (camera.rotationQuaternion) {
+        camera.rotation = camera.rotationQuaternion.toEulerAngles();
+        camera.rotationQuaternion = null as any; // Cast to any to avoid TypeScript error
+      }
     };
     window.addEventListener('keydown', keydownHandler);
 
@@ -184,27 +200,41 @@ const App: React.FC = () => {
         animatingToPath = true;
         userControl = false;
 
+        // Ensure rotationQuaternion is set
+        if (!camera.rotationQuaternion) {
+          camera.rotationQuaternion = BABYLON.Quaternion.FromEulerAngles(
+            camera.rotation.x,
+            camera.rotation.y,
+            camera.rotation.z
+          );
+          camera.rotation.set(0, 0, 0);
+        }
+
         // Find the closest point on the path
         const closestPointInfo = getClosestPointOnPath(camera.position, path);
         const startIndex = closestPointInfo.index;
 
-        // Compute the desired position and rotation
+        // Compute the desired position
         const targetPosition = path[startIndex];
 
         // Compute the tangent at the closest point
-        let tangent: BABYLON.Vector3;
+        let direction: BABYLON.Vector3;
         if (startIndex < path.length - 1) {
-          tangent = path[startIndex + 1].subtract(path[startIndex]).normalize();
+          direction = path[startIndex + 1].subtract(path[startIndex]).normalize();
         } else if (startIndex > 0) {
-          tangent = path[startIndex].subtract(path[startIndex - 1]).normalize();
+          direction = path[startIndex].subtract(path[startIndex - 1]).normalize();
         } else {
-          tangent = new BABYLON.Vector3(0, 0, 1);
+          direction = new BABYLON.Vector3(0, 0, 1);
         }
 
-        // Compute the desired rotation quaternion
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(tangent, BABYLON.Vector3.Up());
+        // Invert the direction vector
+        direction = direction.negate();
 
-        // Create animations for position and rotationQuaternion
+        // Compute the desired rotation quaternion
+        const up = BABYLON.Vector3.Up();
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(direction, up);
+
+        // Create an animation for position
         const positionAnimation = new BABYLON.Animation(
           'cameraPositionAnimation',
           'position',
@@ -213,6 +243,13 @@ const App: React.FC = () => {
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
         );
 
+        const positionKeys = [];
+        positionKeys.push({ frame: 0, value: camera.position.clone() });
+        positionKeys.push({ frame: 60, value: targetPosition.clone() });
+
+        positionAnimation.setKeys(positionKeys);
+
+        // Create an animation for rotationQuaternion
         const rotationAnimation = new BABYLON.Animation(
           'cameraRotationAnimation',
           'rotationQuaternion',
@@ -221,30 +258,33 @@ const App: React.FC = () => {
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
         );
 
-        const positionKeys = [
-          { frame: 0, value: camera.position.clone() },
-          { frame: 60, value: targetPosition.clone() }
-        ];
+        const rotationKeys = [];
+        rotationKeys.push({ frame: 0, value: camera.rotationQuaternion!.clone() });
+        rotationKeys.push({ frame: 60, value: desiredRotation });
 
-        const rotationKeys = [
-          { frame: 0, value: camera.rotationQuaternion.clone() },
-          { frame: 60, value: desiredRotation }
-        ];
-
-        positionAnimation.setKeys(positionKeys);
         rotationAnimation.setKeys(rotationKeys);
 
+        // Add animations to the camera
         camera.animations = [];
         camera.animations.push(positionAnimation);
         camera.animations.push(rotationAnimation);
 
         scene.beginAnimation(camera, 0, 60, false, 1, function () {
           animatingToPath = false;
-
           // Update scrollPosition to match the camera's position on the path
           scrollPosition = startIndex;
         });
       } else {
+        // Ensure rotationQuaternion is set
+        if (!camera.rotationQuaternion) {
+          camera.rotationQuaternion = BABYLON.Quaternion.FromEulerAngles(
+            camera.rotation.x,
+            camera.rotation.y,
+            camera.rotation.z
+          );
+          camera.rotation.set(0, 0, 0);
+        }
+
         // Move the camera along the path based on scroll position
         scrollPosition += event.deltaY;
 
@@ -266,13 +306,18 @@ const App: React.FC = () => {
 
         camera.position.copyFrom(newPosition);
 
-        // Compute tangent vector
-        const tangent = p2.subtract(p1).normalize();
+        // Compute the tangent vector for the path segment
+        let direction = p2.subtract(p1).normalize();
 
-        // Compute rotation quaternion
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(tangent, BABYLON.Vector3.Up());
+        // Invert the direction vector
+        direction = direction.negate();
 
-        camera.rotationQuaternion.copyFrom(desiredRotation);
+        // Compute the desired rotation quaternion
+        const up = BABYLON.Vector3.Up();
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(direction, up);
+
+        // Set the camera's rotationQuaternion
+        camera.rotationQuaternion!.copyFrom(desiredRotation);
       }
     };
     window.addEventListener('wheel', wheelHandler);
@@ -292,19 +337,6 @@ const App: React.FC = () => {
 
       return { index: closestIndex, distanceSquared: minDist };
     }
-
-    // Synchronize rotationQuaternion with rotation during user control
-    camera.onAfterCheckInputsObservable.add(() => {
-      if (camera.rotationQuaternion) {
-        BABYLON.Quaternion.RotationYawPitchRollToRef(
-          camera.rotation.y,
-          camera.rotation.x,
-          camera.rotation.z,
-          camera.rotationQuaternion
-        );
-        camera.rotation.set(0, 0, 0);
-      }
-    });
 
     // Register a render loop to repeatedly render the scene
     engine.runRenderLoop(function () {
