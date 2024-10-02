@@ -1,12 +1,13 @@
 import React, { useRef, useEffect } from 'react';
 import './App.css';
 import * as BABYLON from '@babylonjs/core';
-import '@babylonjs/loaders'; // Includes all loaders, including Gaussian Splatting
+import '@babylonjs/loaders';
 import '@babylonjs/core/Loading/sceneLoader';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dropOverlayRef = useRef<HTMLDivElement | null>(null);
+  const infoTextRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -20,14 +21,48 @@ const App: React.FC = () => {
     // Create the scene
     const scene = new BABYLON.Scene(engine);
 
-    // No need to register the Gaussian Splatting loader anymore
+    // Check for WebXR support
+    if (navigator.xr) {
+      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+        if (supported) {
+          // Enable WebXR support
+          scene.createDefaultXRExperienceAsync().then((xrExperience) => {
+            console.log('WebXR enabled');
+          });
+        } else {
+          console.warn('immersive-vr mode is not supported in this browser.');
+        }
+      });
+    } else {
+      console.warn('WebXR is not supported in this browser.');
+    }
 
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -10), scene);
+    camera.rotationQuaternion = new BABYLON.Quaternion();
     camera.attachControl(canvas, true);
 
+    // Enable WASD keys for movement
+    camera.keysUp.push(87);    // W
+    camera.keysDown.push(83);  // S
+    camera.keysLeft.push(65);  // A
+    camera.keysRight.push(68); // D
+
+    // Enable gamepad control
+    const gamepadManager = scene.gamepadManager;
+    gamepadManager.onGamepadConnectedObservable.add((gamepad) => {
+      console.log("Gamepad connected: " + gamepad.id);
+      if (gamepad instanceof BABYLON.GenericPad) {
+        // Handle standard gamepads
+        gamepad.onleftstickchanged((values) => {
+          camera.cameraDirection.z += values.y * 0.1; // Forward/backward
+          camera.cameraDirection.x += values.x * 0.1; // Left/right
+        });
+      }
+    });
+
     // Create a basic light
-    const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
 
     // Variables for Gaussian Splatting Mesh
     let gsMesh: BABYLON.AbstractMesh | null = null;
@@ -56,6 +91,7 @@ const App: React.FC = () => {
           if (!isComponentMounted) return; // Prevent setting state if unmounted
           gsMesh = result.meshes[0];
           gsMesh.position = BABYLON.Vector3.Zero();
+          if (infoTextRef.current) infoTextRef.current.style.display = 'none';
         })
         .catch((error) => {
           console.error('Error loading splat file:', error);
@@ -65,6 +101,7 @@ const App: React.FC = () => {
 
     // Drag-and-Drop Functionality
     const dropOverlay = dropOverlayRef.current;
+    const infoText = infoTextRef.current;
 
     // Event handlers
     const preventDefault = (e: Event) => {
@@ -92,6 +129,7 @@ const App: React.FC = () => {
         const ext = file.name.split('.').pop()?.toLowerCase();
         if (ext === 'splat' || ext === 'ply') {
           loadSplatFile(file);
+          if (infoText) infoText.style.display = 'none';
         } else {
           alert('Please drop a .splat or .ply file.');
         }
@@ -107,17 +145,15 @@ const App: React.FC = () => {
 
     // Camera Path Setup
     const controlPoints = [
-      new BABYLON.Vector3(1, 0, 0),
-      new BABYLON.Vector3(2, 0, 0),
-      new BABYLON.Vector3(3, 0, 0),
-      new BABYLON.Vector3(4, 0, 0),
-      new BABYLON.Vector3(5, 0, 0), // Closing the loop
+      new BABYLON.Vector3(0, 0, -10),
+      new BABYLON.Vector3(0, 0, -8),
+      new BABYLON.Vector3(0, 0, -6),
+      new BABYLON.Vector3(0, 0, -4),
+      new BABYLON.Vector3(0, 0, -2),
     ];
 
-    const curve = BABYLON.Curve3.CreateCatmullRomSpline(controlPoints, 100, true);
+    const curve = BABYLON.Curve3.CreateCatmullRomSpline(controlPoints, 100, false); // Open spline
     const path = curve.getPoints();
-
-    // Remove the green line visualization (as per your request)
 
     // Variables to manage camera control state
     let scrollPosition = 0;
@@ -152,36 +188,74 @@ const App: React.FC = () => {
         const closestPointInfo = getClosestPointOnPath(camera.position, path);
         const startIndex = closestPointInfo.index;
 
-        // Create an animation to move the camera back to the path
-        const animation = new BABYLON.Animation(
-          'cameraAnimation',
+        // Compute the desired position and rotation
+        const targetPosition = path[startIndex];
+
+        // Compute the tangent at the closest point
+        let tangent: BABYLON.Vector3;
+        if (startIndex < path.length - 1) {
+          tangent = path[startIndex + 1].subtract(path[startIndex]).normalize();
+        } else if (startIndex > 0) {
+          tangent = path[startIndex].subtract(path[startIndex - 1]).normalize();
+        } else {
+          tangent = new BABYLON.Vector3(0, 0, 1);
+        }
+
+        // Compute the desired rotation quaternion
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(tangent, BABYLON.Vector3.Up());
+
+        // Create animations for position and rotationQuaternion
+        const positionAnimation = new BABYLON.Animation(
+          'cameraPositionAnimation',
           'position',
           60,
           BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
         );
 
-        const keys = [];
-        keys.push({ frame: 0, value: camera.position.clone() });
-        keys.push({ frame: 60, value: path[startIndex].clone() });
+        const rotationAnimation = new BABYLON.Animation(
+          'cameraRotationAnimation',
+          'rotationQuaternion',
+          60,
+          BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
 
-        animation.setKeys(keys);
+        const positionKeys = [
+          { frame: 0, value: camera.position.clone() },
+          { frame: 60, value: targetPosition.clone() }
+        ];
+
+        const rotationKeys = [
+          { frame: 0, value: camera.rotationQuaternion.clone() },
+          { frame: 60, value: desiredRotation }
+        ];
+
+        positionAnimation.setKeys(positionKeys);
+        rotationAnimation.setKeys(rotationKeys);
 
         camera.animations = [];
-        camera.animations.push(animation);
+        camera.animations.push(positionAnimation);
+        camera.animations.push(rotationAnimation);
 
         scene.beginAnimation(camera, 0, 60, false, 1, function () {
           animatingToPath = false;
+
+          // Update scrollPosition to match the camera's position on the path
+          scrollPosition = startIndex;
         });
       } else {
         // Move the camera along the path based on scroll position
         scrollPosition += event.deltaY;
 
-        let t = (scrollPosition % path.length) / path.length;
-        if (t < 0) t += 1;
+        // Clamp scrollPosition to the path length
+        if (scrollPosition < 0) scrollPosition = 0;
+        if (scrollPosition > path.length - 1) scrollPosition = path.length - 1;
+
+        const t = scrollPosition / (path.length - 1);
 
         const index = Math.floor(t * (path.length - 1));
-        const nextIndex = (index + 1) % path.length;
+        const nextIndex = Math.min(index + 1, path.length - 1);
 
         const p1 = path[index];
         const p2 = path[nextIndex];
@@ -192,8 +266,13 @@ const App: React.FC = () => {
 
         camera.position.copyFrom(newPosition);
 
-        // Make the camera look at the center of the scene
-        camera.setTarget(BABYLON.Vector3.Zero());
+        // Compute tangent vector
+        const tangent = p2.subtract(p1).normalize();
+
+        // Compute rotation quaternion
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(tangent, BABYLON.Vector3.Up());
+
+        camera.rotationQuaternion.copyFrom(desiredRotation);
       }
     };
     window.addEventListener('wheel', wheelHandler);
@@ -213,6 +292,19 @@ const App: React.FC = () => {
 
       return { index: closestIndex, distanceSquared: minDist };
     }
+
+    // Synchronize rotationQuaternion with rotation during user control
+    camera.onAfterCheckInputsObservable.add(() => {
+      if (camera.rotationQuaternion) {
+        BABYLON.Quaternion.RotationYawPitchRollToRef(
+          camera.rotation.y,
+          camera.rotation.x,
+          camera.rotation.z,
+          camera.rotationQuaternion
+        );
+        camera.rotation.set(0, 0, 0);
+      }
+    });
 
     // Register a render loop to repeatedly render the scene
     engine.runRenderLoop(function () {
@@ -270,6 +362,19 @@ const App: React.FC = () => {
         }}
       >
         Drop your splat file here
+      </div>
+      <div
+        ref={infoTextRef}
+        style={{
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          color: 'white',
+          fontSize: '18px',
+          zIndex: 5,
+        }}
+      >
+        Please drag and drop a .splat or .ply file to load.
       </div>
       <canvas
         ref={canvasRef}
