@@ -1,14 +1,23 @@
-import React, { useRef, useEffect } from 'react';
-import './App.css';
-import * as BABYLON from '@babylonjs/core';
-import { Nullable } from '@babylonjs/core/types';
-import '@babylonjs/loaders';
-import '@babylonjs/core/Loading/sceneLoader';
+import React, { useRef, useEffect, useState } from "react";
+import "./App.css";
+import * as BABYLON from "@babylonjs/core";
+import { Nullable } from "@babylonjs/core/types";
+import "@babylonjs/loaders";
+import "@babylonjs/core/Loading/sceneLoader";
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dropOverlayRef = useRef<HTMLDivElement | null>(null);
   const infoTextRef = useRef<HTMLDivElement | null>(null);
+
+  // State to hold waypoint coordinates
+  const [waypoints, setWaypoints] = useState([
+    { x: 0, y: 0, z: -10 },
+    { x: 0, y: 0, z: -8 },
+    { x: 0, y: 0, z: -6 },
+    { x: 0, y: 0, z: -4 },
+    { x: 0, y: 0, z: -2 },
+  ]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -24,22 +33,26 @@ const App: React.FC = () => {
 
     // Check for WebXR support
     if (navigator.xr) {
-      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+      navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
         if (supported) {
           // Enable WebXR support
           scene.createDefaultXRExperienceAsync().then((xrExperience) => {
-            console.log('WebXR enabled');
+            console.log("WebXR enabled");
           });
         } else {
-          console.warn('immersive-vr mode is not supported in this browser.');
+          console.warn("immersive-vr mode is not supported in this browser.");
         }
       });
     } else {
-      console.warn('WebXR is not supported in this browser.');
+      console.warn("WebXR is not supported in this browser.");
     }
 
     // Create a universal camera and position it
-    const camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -10), scene);
+    const camera = new BABYLON.UniversalCamera(
+      "camera",
+      new BABYLON.Vector3(waypoints[0].x, waypoints[0].y, waypoints[0].z),
+      scene
+    );
     camera.attachControl(canvas, true);
 
     // Adjust camera sensitivity
@@ -47,9 +60,9 @@ const App: React.FC = () => {
     camera.angularSensibility = 4000; // Increases mouse rotation sensitivity (less sensitive)
 
     // Enable WASD keys for movement
-    camera.keysUp.push(87);    // W
-    camera.keysDown.push(83);  // S
-    camera.keysLeft.push(65);  // A
+    camera.keysUp.push(87); // W
+    camera.keysDown.push(83); // S
+    camera.keysLeft.push(65); // A
     camera.keysRight.push(68); // D
 
     // Enable gamepad control
@@ -66,7 +79,7 @@ const App: React.FC = () => {
     });
 
     // Create a basic light
-    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
     // Variables for Gaussian Splatting Mesh
     let gsMesh: BABYLON.AbstractMesh | null = null;
@@ -80,12 +93,12 @@ const App: React.FC = () => {
         gsMesh = null;
       }
 
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
 
       // Pass the File object directly to the loader
       BABYLON.SceneLoader.ImportMeshAsync(
         null,
-        '',
+        "",
         file,
         scene,
         null,
@@ -95,11 +108,11 @@ const App: React.FC = () => {
           if (!isComponentMounted) return; // Prevent setting state if unmounted
           gsMesh = result.meshes[0];
           gsMesh.position = BABYLON.Vector3.Zero();
-          if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+          if (infoTextRef.current) infoTextRef.current.style.display = "none";
         })
         .catch((error) => {
-          console.error('Error loading splat file:', error);
-          alert('Error loading splat file: ' + error.message);
+          console.error("Error loading splat file:", error);
+          alert("Error loading splat file: " + error.message);
         });
     };
 
@@ -115,12 +128,12 @@ const App: React.FC = () => {
 
     const handleDragEnterOver = (e: Event) => {
       preventDefault(e);
-      if (dropOverlay) dropOverlay.style.display = 'flex';
+      if (dropOverlay) dropOverlay.style.display = "flex";
     };
 
     const handleDragLeaveDrop = (e: Event) => {
       preventDefault(e);
-      if (dropOverlay) dropOverlay.style.display = 'none';
+      if (dropOverlay) dropOverlay.style.display = "none";
     };
 
     const handleDrop = (e: DragEvent) => {
@@ -130,33 +143,34 @@ const App: React.FC = () => {
 
       if (files && files.length > 0) {
         const file = files[0];
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        if (ext === 'splat' || ext === 'ply') {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        if (ext === "splat" || ext === "ply") {
           loadSplatFile(file);
-          if (infoText) infoText.style.display = 'none';
+          if (infoText) infoText.style.display = "none";
         } else {
-          alert('Please drop a .splat or .ply file.');
+          alert("Please drop a .splat or .ply file.");
         }
       }
     };
 
     // Add event listeners
-    document.addEventListener('dragenter', handleDragEnterOver, false);
-    document.addEventListener('dragover', handleDragEnterOver, false);
-    document.addEventListener('dragleave', handleDragLeaveDrop, false);
-    document.addEventListener('drop', handleDragLeaveDrop, false);
-    document.addEventListener('drop', handleDrop, false);
+    document.addEventListener("dragenter", handleDragEnterOver, false);
+    document.addEventListener("dragover", handleDragEnterOver, false);
+    document.addEventListener("dragleave", handleDragLeaveDrop, false);
+    document.addEventListener("drop", handleDragLeaveDrop, false);
+    document.addEventListener("drop", handleDrop, false);
 
     // Camera Path Setup
-    const controlPoints = [
-      new BABYLON.Vector3(0, 0, -10),
-      new BABYLON.Vector3(0, 0, -8),
-      new BABYLON.Vector3(0, 0, -6),
-      new BABYLON.Vector3(0, 0, -4),
-      new BABYLON.Vector3(0, 0, -2),
-    ];
+    // Convert waypoints to BABYLON.Vector3
+    const controlPoints = waypoints.map(
+      (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
+    );
 
-    const curve = BABYLON.Curve3.CreateCatmullRomSpline(controlPoints, 100, false); // Open spline
+    const curve = BABYLON.Curve3.CreateCatmullRomSpline(
+      controlPoints,
+      100,
+      false
+    ); // Open spline
     const path = curve.getPoints();
 
     // Variables to manage camera control state
@@ -189,7 +203,7 @@ const App: React.FC = () => {
         camera.rotationQuaternion = null as any; // Cast to any to avoid TypeScript error
       }
     };
-    window.addEventListener('keydown', keydownHandler);
+    window.addEventListener("keydown", keydownHandler);
 
     // Handle scroll events to move the camera along the path or animate it back
     const wheelHandler = (event: WheelEvent) => {
@@ -220,9 +234,13 @@ const App: React.FC = () => {
         // Compute the tangent at the closest point
         let direction: BABYLON.Vector3;
         if (startIndex < path.length - 1) {
-          direction = path[startIndex + 1].subtract(path[startIndex]).normalize();
+          direction = path[startIndex + 1]
+            .subtract(path[startIndex])
+            .normalize();
         } else if (startIndex > 0) {
-          direction = path[startIndex].subtract(path[startIndex - 1]).normalize();
+          direction = path[startIndex]
+            .subtract(path[startIndex - 1])
+            .normalize();
         } else {
           direction = new BABYLON.Vector3(0, 0, 1);
         }
@@ -232,12 +250,15 @@ const App: React.FC = () => {
 
         // Compute the desired rotation quaternion
         const up = BABYLON.Vector3.Up();
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(direction, up);
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(
+          direction,
+          up
+        );
 
         // Create an animation for position
         const positionAnimation = new BABYLON.Animation(
-          'cameraPositionAnimation',
-          'position',
+          "cameraPositionAnimation",
+          "position",
           60,
           BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -251,15 +272,18 @@ const App: React.FC = () => {
 
         // Create an animation for rotationQuaternion
         const rotationAnimation = new BABYLON.Animation(
-          'cameraRotationAnimation',
-          'rotationQuaternion',
+          "cameraRotationAnimation",
+          "rotationQuaternion",
           60,
           BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
         );
 
         const rotationKeys = [];
-        rotationKeys.push({ frame: 0, value: camera.rotationQuaternion!.clone() });
+        rotationKeys.push({
+          frame: 0,
+          value: camera.rotationQuaternion!.clone(),
+        });
         rotationKeys.push({ frame: 60, value: desiredRotation });
 
         rotationAnimation.setKeys(rotationKeys);
@@ -314,16 +338,22 @@ const App: React.FC = () => {
 
         // Compute the desired rotation quaternion
         const up = BABYLON.Vector3.Up();
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(direction, up);
+        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(
+          direction,
+          up
+        );
 
         // Set the camera's rotationQuaternion
         camera.rotationQuaternion!.copyFrom(desiredRotation);
       }
     };
-    window.addEventListener('wheel', wheelHandler);
+    window.addEventListener("wheel", wheelHandler);
 
     // Helper function to find the closest point on the path to the camera
-    function getClosestPointOnPath(position: BABYLON.Vector3, path: BABYLON.Vector3[]) {
+    function getClosestPointOnPath(
+      position: BABYLON.Vector3,
+      path: BABYLON.Vector3[]
+    ) {
       let minDist = Infinity;
       let closestIndex = 0;
 
@@ -349,20 +379,20 @@ const App: React.FC = () => {
     const resizeHandler = () => {
       engine.resize();
     };
-    window.addEventListener('resize', resizeHandler);
+    window.addEventListener("resize", resizeHandler);
 
     // Cleanup on component unmount
     return () => {
       isComponentMounted = false; // Update the flag
       // Remove event listeners
-      document.removeEventListener('dragenter', handleDragEnterOver, false);
-      document.removeEventListener('dragover', handleDragEnterOver, false);
-      document.removeEventListener('dragleave', handleDragLeaveDrop, false);
-      document.removeEventListener('drop', handleDragLeaveDrop, false);
-      document.removeEventListener('drop', handleDrop, false);
-      window.removeEventListener('keydown', keydownHandler);
-      window.removeEventListener('wheel', wheelHandler);
-      window.removeEventListener('resize', resizeHandler);
+      document.removeEventListener("dragenter", handleDragEnterOver, false);
+      document.removeEventListener("dragover", handleDragEnterOver, false);
+      document.removeEventListener("dragleave", handleDragLeaveDrop, false);
+      document.removeEventListener("drop", handleDragLeaveDrop, false);
+      document.removeEventListener("drop", handleDrop, false);
+      window.removeEventListener("keydown", keydownHandler);
+      window.removeEventListener("wheel", wheelHandler);
+      window.removeEventListener("resize", resizeHandler);
 
       scene.onPointerObservable.remove(pointerObservable);
 
@@ -370,26 +400,42 @@ const App: React.FC = () => {
       scene.dispose();
       engine.dispose();
     };
-  }, []);
+  }, [waypoints]); // Re-run effect when waypoints change
+
+  // Function to handle waypoint input changes
+  const handleWaypointChange = (
+    index: number,
+    axis: "x" | "y" | "z",
+    value: string
+  ) => {
+    const newWaypoints = [...waypoints];
+    newWaypoints[index][axis] = parseFloat(value);
+    setWaypoints(newWaypoints);
+  };
 
   return (
     <div
-      style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}
+      style={{
+        width: "100vw",
+        height: "100vh",
+        position: "relative",
+        overflow: "hidden",
+      }}
     >
       <div
         ref={dropOverlayRef}
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'none',
-          justifyContent: 'center',
-          alignItems: 'center',
-          color: 'white',
-          fontSize: '24px',
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "none",
+          justifyContent: "center",
+          alignItems: "center",
+          color: "white",
+          fontSize: "24px",
           zIndex: 10,
         }}
       >
@@ -398,19 +444,80 @@ const App: React.FC = () => {
       <div
         ref={infoTextRef}
         style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px',
-          color: 'white',
-          fontSize: '18px',
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          color: "white",
+          fontSize: "24px",
+          textAlign: "center",
           zIndex: 5,
         }}
       >
-        Please drag and drop a .splat or .ply file to load.
+        Please drag and drop a <br /> .splat or .ply file to load.
+      </div>
+      {/* Waypoint Input Form */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "10px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          backgroundColor: "rgba(0,0,0,0.7)",
+          padding: "10px",
+          borderRadius: "5px",
+          color: "white",
+          zIndex: 10,
+        }}
+      >
+        <h3 style={{ margin: "0 0 10px 0", textAlign: "center" }}>
+          Edit Waypoints
+        </h3>
+        {waypoints.map((wp, index) => (
+          <div key={index} style={{ marginBottom: "5px" }}>
+            <span>Waypoint {index + 1}: </span>
+            <label>
+              X:
+              <input
+                type="number"
+                step="0.1"
+                value={wp.x}
+                onChange={(e) =>
+                  handleWaypointChange(index, "x", e.target.value)
+                }
+                style={{ width: "60px", marginLeft: "5px" }}
+              />
+            </label>
+            <label style={{ marginLeft: "10px" }}>
+              Y:
+              <input
+                type="number"
+                step="0.1"
+                value={wp.y}
+                onChange={(e) =>
+                  handleWaypointChange(index, "y", e.target.value)
+                }
+                style={{ width: "60px", marginLeft: "5px" }}
+              />
+            </label>
+            <label style={{ marginLeft: "10px" }}>
+              Z:
+              <input
+                type="number"
+                step="0.1"
+                value={wp.z}
+                onChange={(e) =>
+                  handleWaypointChange(index, "z", e.target.value)
+                }
+                style={{ width: "60px", marginLeft: "5px" }}
+              />
+            </label>
+          </div>
+        ))}
       </div>
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: '100%', touchAction: 'none' }}
+        style={{ width: "100%", height: "100%", touchAction: "none" }}
       />
     </div>
   );
