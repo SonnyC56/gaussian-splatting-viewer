@@ -1,13 +1,11 @@
-import React, { useRef, useEffect, useState } from "react";
-import "./App.css";
-import * as BABYLON from "@babylonjs/core";
-import { Nullable } from "@babylonjs/core/types";
-import "@babylonjs/loaders";
-import "@babylonjs/core/Loading/sceneLoader";
+import React, { useRef, useEffect, useState } from 'react';
+import './App.css';
+import * as BABYLON from '@babylonjs/core';
+import '@babylonjs/loaders';
+import '@babylonjs/core/Loading/sceneLoader';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dropOverlayRef = useRef<HTMLDivElement | null>(null);
   const infoTextRef = useRef<HTMLDivElement | null>(null);
 
   // State to hold waypoint coordinates
@@ -18,6 +16,9 @@ const App: React.FC = () => {
     { x: 0, y: 0, z: -4 },
     { x: 0, y: 0, z: -2 },
   ]);
+
+  // State to manage the visibility of the controls info section
+  const [showControlsInfo, setShowControlsInfo] = useState(true);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -33,23 +34,23 @@ const App: React.FC = () => {
 
     // Check for WebXR support
     if (navigator.xr) {
-      navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
+      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
         if (supported) {
           // Enable WebXR support
-          scene.createDefaultXRExperienceAsync().then((xrExperience) => {
-            console.log("WebXR enabled");
+          scene.createDefaultXRExperienceAsync().then(() => {
+            console.log('WebXR enabled');
           });
         } else {
-          console.warn("immersive-vr mode is not supported in this browser.");
+          console.warn('immersive-vr mode is not supported in this browser.');
         }
       });
     } else {
-      console.warn("WebXR is not supported in this browser.");
+      console.warn('WebXR is not supported in this browser.');
     }
 
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera(
-      "camera",
+      'camera',
       new BABYLON.Vector3(waypoints[0].x, waypoints[0].y, waypoints[0].z),
       scene
     );
@@ -68,7 +69,7 @@ const App: React.FC = () => {
     // Enable gamepad control
     const gamepadManager = scene.gamepadManager;
     gamepadManager.onGamepadConnectedObservable.add((gamepad) => {
-      console.log("Gamepad connected: " + gamepad.id);
+      console.log('Gamepad connected: ' + gamepad.id);
       if (gamepad instanceof BABYLON.GenericPad) {
         // Handle standard gamepads
         gamepad.onleftstickchanged((values) => {
@@ -79,7 +80,7 @@ const App: React.FC = () => {
     });
 
     // Create a basic light
-    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
 
     // Variables for Gaussian Splatting Mesh
     let gsMesh: BABYLON.AbstractMesh | null = null;
@@ -93,12 +94,12 @@ const App: React.FC = () => {
         gsMesh = null;
       }
 
-      const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
 
       // Pass the File object directly to the loader
       BABYLON.SceneLoader.ImportMeshAsync(
         null,
-        "",
+        '',
         file,
         scene,
         null,
@@ -108,32 +109,65 @@ const App: React.FC = () => {
           if (!isComponentMounted) return; // Prevent setting state if unmounted
           gsMesh = result.meshes[0];
           gsMesh.position = BABYLON.Vector3.Zero();
-          if (infoTextRef.current) infoTextRef.current.style.display = "none";
+          if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+
+          // Add hover interaction to the mesh
+          gsMesh.actionManager = new BABYLON.ActionManager(scene);
+
+          gsMesh.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+              BABYLON.ActionManager.OnPointerOverTrigger,
+              () => {
+                // Show tooltip
+                const tooltip = document.createElement('div');
+                tooltip.id = 'tooltip';
+                tooltip.innerText = 'Hot spot example';
+                tooltip.style.position = 'absolute';
+                tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                tooltip.style.color = 'white';
+                tooltip.style.padding = '5px';
+                tooltip.style.borderRadius = '5px';
+                tooltip.style.pointerEvents = 'none';
+                tooltip.style.zIndex = '15';
+                document.body.appendChild(tooltip);
+
+                scene.onPointerMove = function (evt) {
+                  if (tooltip) {
+                    tooltip.style.left = evt.clientX + 10 + 'px';
+                    tooltip.style.top = evt.clientY + 10 + 'px';
+                  }
+                };
+              }
+            )
+          );
+
+          gsMesh.actionManager.registerAction(
+            new BABYLON.ExecuteCodeAction(
+              BABYLON.ActionManager.OnPointerOutTrigger,
+              () => {
+                // Hide tooltip
+                const tooltip = document.getElementById('tooltip');
+                if (tooltip) {
+                  tooltip.remove();
+                }
+                scene.onPointerMove = undefined; // Assign undefined to remove the handler
+              }
+            )
+          );
         })
         .catch((error) => {
-          console.error("Error loading splat file:", error);
-          alert("Error loading splat file: " + error.message);
+          console.error('Error loading splat file:', error);
+          alert('Error loading splat file: ' + error.message);
         });
     };
 
     // Drag-and-Drop Functionality
-    const dropOverlay = dropOverlayRef.current;
     const infoText = infoTextRef.current;
 
     // Event handlers
     const preventDefault = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-    };
-
-    const handleDragEnterOver = (e: Event) => {
-      preventDefault(e);
-      if (dropOverlay) dropOverlay.style.display = "flex";
-    };
-
-    const handleDragLeaveDrop = (e: Event) => {
-      preventDefault(e);
-      if (dropOverlay) dropOverlay.style.display = "none";
     };
 
     const handleDrop = (e: DragEvent) => {
@@ -143,22 +177,19 @@ const App: React.FC = () => {
 
       if (files && files.length > 0) {
         const file = files[0];
-        const ext = file.name.split(".").pop()?.toLowerCase();
-        if (ext === "splat" || ext === "ply") {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext === 'splat' || ext === 'ply') {
           loadSplatFile(file);
-          if (infoText) infoText.style.display = "none";
+          if (infoText) infoText.style.display = 'none';
         } else {
-          alert("Please drop a .splat or .ply file.");
+          alert('Please drop a .splat or .ply file.');
         }
       }
     };
 
     // Add event listeners
-    document.addEventListener("dragenter", handleDragEnterOver, false);
-    document.addEventListener("dragover", handleDragEnterOver, false);
-    document.addEventListener("dragleave", handleDragLeaveDrop, false);
-    document.addEventListener("drop", handleDragLeaveDrop, false);
-    document.addEventListener("drop", handleDrop, false);
+    document.addEventListener('dragover', preventDefault, false);
+    document.addEventListener('drop', handleDrop, false);
 
     // Camera Path Setup
     // Convert waypoints to BABYLON.Vector3
@@ -189,7 +220,7 @@ const App: React.FC = () => {
         // Switch to Euler angles (rotation) when user takes control
         if (camera.rotationQuaternion) {
           camera.rotation = camera.rotationQuaternion.toEulerAngles();
-          camera.rotationQuaternion = null as any; // Cast to any to avoid TypeScript error
+          (camera as any).rotationQuaternion = null; // Use type assertion to assign null
         }
       }
     });
@@ -200,10 +231,10 @@ const App: React.FC = () => {
       // Switch to Euler angles (rotation) when user takes control
       if (camera.rotationQuaternion) {
         camera.rotation = camera.rotationQuaternion.toEulerAngles();
-        camera.rotationQuaternion = null as any; // Cast to any to avoid TypeScript error
+        (camera as any).rotationQuaternion = null; // Use type assertion to assign null
       }
     };
-    window.addEventListener("keydown", keydownHandler);
+    window.addEventListener('keydown', keydownHandler);
 
     // Handle scroll events to move the camera along the path or animate it back
     const wheelHandler = (event: WheelEvent) => {
@@ -225,7 +256,10 @@ const App: React.FC = () => {
         }
 
         // Find the closest point on the path
-        const closestPointInfo = getClosestPointOnPath(camera.position, path);
+        const closestPointInfo = getClosestPointOnPath(
+          camera.position,
+          path
+        );
         const startIndex = closestPointInfo.index;
 
         // Compute the desired position
@@ -250,15 +284,13 @@ const App: React.FC = () => {
 
         // Compute the desired rotation quaternion
         const up = BABYLON.Vector3.Up();
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(
-          direction,
-          up
-        );
+        const desiredRotation =
+          BABYLON.Quaternion.FromLookDirectionLH(direction, up);
 
         // Create an animation for position
         const positionAnimation = new BABYLON.Animation(
-          "cameraPositionAnimation",
-          "position",
+          'cameraPositionAnimation',
+          'position',
           60,
           BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -272,8 +304,8 @@ const App: React.FC = () => {
 
         // Create an animation for rotationQuaternion
         const rotationAnimation = new BABYLON.Animation(
-          "cameraRotationAnimation",
-          "rotationQuaternion",
+          'cameraRotationAnimation',
+          'rotationQuaternion',
           60,
           BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -314,7 +346,8 @@ const App: React.FC = () => {
 
         // Clamp scrollPosition to the path length
         if (scrollPosition < 0) scrollPosition = 0;
-        if (scrollPosition > path.length - 1) scrollPosition = path.length - 1;
+        if (scrollPosition > path.length - 1)
+          scrollPosition = path.length - 1;
 
         const t = scrollPosition / (path.length - 1);
 
@@ -338,16 +371,14 @@ const App: React.FC = () => {
 
         // Compute the desired rotation quaternion
         const up = BABYLON.Vector3.Up();
-        const desiredRotation = BABYLON.Quaternion.FromLookDirectionLH(
-          direction,
-          up
-        );
+        const desiredRotation =
+          BABYLON.Quaternion.FromLookDirectionLH(direction, up);
 
         // Set the camera's rotationQuaternion
         camera.rotationQuaternion!.copyFrom(desiredRotation);
       }
     };
-    window.addEventListener("wheel", wheelHandler);
+    window.addEventListener('wheel', wheelHandler);
 
     // Helper function to find the closest point on the path to the camera
     function getClosestPointOnPath(
@@ -379,20 +410,17 @@ const App: React.FC = () => {
     const resizeHandler = () => {
       engine.resize();
     };
-    window.addEventListener("resize", resizeHandler);
+    window.addEventListener('resize', resizeHandler);
 
     // Cleanup on component unmount
     return () => {
       isComponentMounted = false; // Update the flag
       // Remove event listeners
-      document.removeEventListener("dragenter", handleDragEnterOver, false);
-      document.removeEventListener("dragover", handleDragEnterOver, false);
-      document.removeEventListener("dragleave", handleDragLeaveDrop, false);
-      document.removeEventListener("drop", handleDragLeaveDrop, false);
-      document.removeEventListener("drop", handleDrop, false);
-      window.removeEventListener("keydown", keydownHandler);
-      window.removeEventListener("wheel", wheelHandler);
-      window.removeEventListener("resize", resizeHandler);
+      document.removeEventListener('dragover', preventDefault, false);
+      document.removeEventListener('drop', handleDrop, false);
+      window.removeEventListener('keydown', keydownHandler);
+      window.removeEventListener('wheel', wheelHandler);
+      window.removeEventListener('resize', resizeHandler);
 
       scene.onPointerObservable.remove(pointerObservable);
 
@@ -405,7 +433,7 @@ const App: React.FC = () => {
   // Function to handle waypoint input changes
   const handleWaypointChange = (
     index: number,
-    axis: "x" | "y" | "z",
+    axis: 'x' | 'y' | 'z',
     value: string
   ) => {
     const newWaypoints = [...waypoints];
@@ -416,41 +444,22 @@ const App: React.FC = () => {
   return (
     <div
       style={{
-        width: "100vw",
-        height: "100vh",
-        position: "relative",
-        overflow: "hidden",
+        width: '100vw',
+        height: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
       <div
-        ref={dropOverlayRef}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          display: "none",
-          justifyContent: "center",
-          alignItems: "center",
-          color: "white",
-          fontSize: "24px",
-          zIndex: 10,
-        }}
-      >
-        Drop your splat file here
-      </div>
-      <div
         ref={infoTextRef}
         style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          color: "white",
-          fontSize: "24px",
-          textAlign: "center",
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'white',
+          fontSize: '24px',
+          textAlign: 'center',
           zIndex: 5,
         }}
       >
@@ -459,22 +468,22 @@ const App: React.FC = () => {
       {/* Waypoint Input Form */}
       <div
         style={{
-          position: "absolute",
-          bottom: "10px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          backgroundColor: "rgba(0,0,0,0.7)",
-          padding: "10px",
-          borderRadius: "5px",
-          color: "white",
+          position: 'absolute',
+          bottom: '10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: '10px',
+          borderRadius: '5px',
+          color: 'white',
           zIndex: 10,
         }}
       >
-        <h3 style={{ margin: "0 0 10px 0", textAlign: "center" }}>
+        <h3 style={{ margin: '0 0 10px 0', textAlign: 'center' }}>
           Edit Waypoints
         </h3>
         {waypoints.map((wp, index) => (
-          <div key={index} style={{ marginBottom: "5px" }}>
+          <div key={index} style={{ marginBottom: '5px' }}>
             <span>Waypoint {index + 1}: </span>
             <label>
               X:
@@ -483,41 +492,80 @@ const App: React.FC = () => {
                 step="0.1"
                 value={wp.x}
                 onChange={(e) =>
-                  handleWaypointChange(index, "x", e.target.value)
+                  handleWaypointChange(index, 'x', e.target.value)
                 }
-                style={{ width: "60px", marginLeft: "5px" }}
+                style={{ width: '60px', marginLeft: '5px' }}
               />
             </label>
-            <label style={{ marginLeft: "10px" }}>
+            <label style={{ marginLeft: '10px' }}>
               Y:
               <input
                 type="number"
                 step="0.1"
                 value={wp.y}
                 onChange={(e) =>
-                  handleWaypointChange(index, "y", e.target.value)
+                  handleWaypointChange(index, 'y', e.target.value)
                 }
-                style={{ width: "60px", marginLeft: "5px" }}
+                style={{ width: '60px', marginLeft: '5px' }}
               />
             </label>
-            <label style={{ marginLeft: "10px" }}>
+            <label style={{ marginLeft: '10px' }}>
               Z:
               <input
                 type="number"
                 step="0.1"
                 value={wp.z}
                 onChange={(e) =>
-                  handleWaypointChange(index, "z", e.target.value)
+                  handleWaypointChange(index, 'z', e.target.value)
                 }
-                style={{ width: "60px", marginLeft: "5px" }}
+                style={{ width: '60px', marginLeft: '5px' }}
               />
             </label>
           </div>
         ))}
       </div>
+      {/* Controls Info Section */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: '10px',
+          borderRadius: '5px',
+          color: 'white',
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={() => setShowControlsInfo(!showControlsInfo)}
+          style={{
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: 'white',
+            fontSize: '16px',
+            cursor: 'pointer',
+          }}
+        >
+          {showControlsInfo ? 'Hide Controls' : 'Show Controls'}
+        </button>
+        {showControlsInfo && (
+          <div style={{ marginTop: '10px' }}>
+            <p>
+              <strong>Controls:</strong>
+            </p>
+            <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+              <li>W/A/S/D: Move camera</li>
+              <li>Mouse: Look around</li>
+              <li>Scroll: Move along path</li>
+              <li>Drag and drop a .splat or .ply file to load</li>
+            </ul>
+          </div>
+        )}
+      </div>
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", height: "100%", touchAction: "none" }}
+        style={{ width: '100%', height: '100%', touchAction: 'none' }}
       />
     </div>
   );
