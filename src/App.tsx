@@ -64,7 +64,7 @@ const App: React.FC = () => {
   const [showScrollControls, setShowScrollControls] = useState(true);
 
   // State for background color
-  const [backgroundColor, setBackgroundColor] = useState<string>('#000000');
+  const [backgroundColor, setBackgroundColor] = useState<string>('#7D7D7D');
 
   // Refs for scene and camera
   const sceneRef = useRef<BABYLON.Scene | null>(null);
