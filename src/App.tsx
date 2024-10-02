@@ -79,6 +79,10 @@ const App: React.FC = () => {
   const userControlRef = useRef<boolean>(false);
   const animatingToPathRef = useRef<boolean>(false);
 
+  // New state variables
+  const [customSplatUrl, setCustomSplatUrl] = useState<string>('');
+  const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
+
   // Function to adjust scroll via buttons
   const adjustScroll = (direction: number) => {
     const increment = 10; // Percentage increment
@@ -186,6 +190,8 @@ const App: React.FC = () => {
 
             // Hide the info text
             if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+
+            setIsModelLocal(false); // Model is from URL
           })
           .catch((error) => {
             console.error('Error loading splat file:', error);
@@ -215,6 +221,8 @@ const App: React.FC = () => {
 
             // Hide the info text
             if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+
+            setIsModelLocal(true); // Model is from local file
           })
           .catch((error) => {
             console.error('Error loading splat file:', error);
@@ -671,6 +679,353 @@ const App: React.FC = () => {
     'gs_Fire_Pit.splat',
   ];
 
+  // Function to handle exporting the scene
+  const handleExport = async () => {
+    let splatUrl = loadedSplatUrl || customSplatUrl;
+
+    if (isModelLocal) {
+      // Prompt the user for a hosted URL
+      splatUrl = prompt(
+        'Please provide a URL where the model is hosted:',
+        ''
+      ) ?? '';
+      if (!splatUrl) {
+        alert('Export cancelled. You must provide a URL for the model.');
+        return;
+      }
+    }
+
+    // Ask the user whether to include the controls UI
+    const includeUI = window.confirm(
+      'Do you want to include the controls UI in the exported HTML?'
+    );
+
+    // Generate the HTML content
+    const htmlContent = generateExportedHTML(splatUrl, includeUI);
+
+    // Create a blob and trigger download
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'exported_scene.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Function to generate the exported HTML
+  const generateExportedHTML = (splatUrl: string, includeUI: boolean) => {
+    // Prepare the waypoints and rotations data
+    const waypointsData = waypoints.map((wp) => ({
+      x: wp.x,
+      y: wp.y,
+      z: wp.z,
+      rotation: {
+        x: wp.rotation.x,
+        y: wp.rotation.y,
+        z: wp.rotation.z,
+        w: wp.rotation.w,
+      },
+    }));
+
+    // Generate the HTML content
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Exported Scene</title>
+  <style>
+    body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
+    #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+    ${
+      includeUI
+        ? `
+    .ui-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      z-index: 10;
+    }
+    `
+        : ''
+    }
+  </style>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  ${
+    includeUI
+      ? `
+  <div class="ui-overlay">
+    <p>Use W/A/S/D to move, mouse to look around.</p>
+    <p>Scroll to move along the path.</p>
+  </div>
+  `
+      : ''
+  }
+  <!-- Babylon.js CDN -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+  <script>
+    // Get the canvas element
+    const canvas = document.getElementById('renderCanvas');
+
+    // Generate the Babylon.js 3D engine
+    const engine = new BABYLON.Engine(canvas, true);
+
+    // Create the scene
+    const scene = new BABYLON.Scene(engine);
+
+    // Create a universal camera and position it
+    const camera = new BABYLON.UniversalCamera(
+      'camera',
+      new BABYLON.Vector3(${waypoints[0].x}, ${waypoints[0].y}, ${waypoints[0].z}),
+      scene
+    );
+    camera.attachControl(canvas, true);
+
+    // Adjust camera sensitivity
+    camera.speed = ${cameraMovementSpeed};
+    camera.angularSensibility = ${cameraRotationSensitivity};
+
+    // Enable WASD keys for movement
+    camera.keysUp.push(87); // W
+    camera.keysDown.push(83); // S
+    camera.keysLeft.push(65); // A
+    camera.keysRight.push(68); // D
+
+    // Create a basic light
+    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+
+    // Variables to manage camera control state
+    let userControl = false;
+    let animatingToPath = false;
+
+    // Variables for scroll position and target
+    let scrollPosition = 0;
+    let scrollTarget = 0;
+
+    // Load the splat file
+    BABYLON.SceneLoader.ImportMeshAsync('', '', '${splatUrl}', scene)
+      .then(() => {
+        // Scene is ready
+      })
+      .catch((error) => {
+        console.error('Error loading splat file:', error);
+        alert('Error loading splat file: ' + error.message);
+      });
+
+    // Prepare waypoints and rotations
+    const waypoints = ${JSON.stringify(waypointsData)};
+    const controlPoints = waypoints.map(
+      (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
+    );
+    const rotations = waypoints.map(
+      (wp) => new BABYLON.Quaternion(wp.rotation.x, wp.rotation.y, wp.rotation.z, wp.rotation.w)
+    );
+
+    let path = [];
+
+    if (controlPoints.length >= 2) {
+      const positionCurve = BABYLON.Curve3.CreateCatmullRomSpline(
+        controlPoints,
+        (waypoints.length - 1) * 10,
+        false
+      );
+      path = positionCurve.getPoints();
+    } else if (controlPoints.length === 1) {
+      path = [controlPoints[0]];
+    }
+
+    // Handle scroll events
+    window.addEventListener('wheel', (event) => {
+      if (animatingToPath) return;
+
+      if (userControl) {
+        animatingToPath = true;
+        userControl = false;
+
+        if (!camera.rotationQuaternion) {
+          camera.rotationQuaternion = BABYLON.Quaternion.FromEulerAngles(
+            camera.rotation.x,
+            camera.rotation.y,
+            camera.rotation.z
+          );
+          camera.rotation.set(0, 0, 0);
+        }
+
+        const closestPointInfo = getClosestPointOnPath(camera.position, path);
+        const startIndex = closestPointInfo.index;
+
+        const targetPosition = path[startIndex];
+
+        let targetRotation = camera.rotationQuaternion.clone();
+        if (rotations.length >= 2 && path.length >= 2) {
+          const t = startIndex / (path.length - 1);
+          const totalSegments = waypoints.length - 1;
+          const segmentT = t * totalSegments;
+          const segmentIndex = Math.floor(segmentT);
+          const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
+          const lerpFactor = segmentT - clampedSegmentIndex;
+
+          const r1 = rotations[clampedSegmentIndex];
+          const r2 = rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
+          targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
+        } else if (rotations.length === 1) {
+          targetRotation = rotations[0];
+        }
+
+        const positionAnimation = new BABYLON.Animation(
+          'cameraPositionAnimation',
+          'position',
+          60,
+          BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+
+        const positionKeys = [];
+        positionKeys.push({ frame: 0, value: camera.position.clone() });
+        positionKeys.push({ frame: ${animationFrames}, value: targetPosition.clone() });
+
+        positionAnimation.setKeys(positionKeys);
+
+        const easingFunction = new BABYLON.CubicEase();
+        easingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+        positionAnimation.setEasingFunction(easingFunction);
+
+        const rotationAnimation = new BABYLON.Animation(
+          'cameraRotationAnimation',
+          'rotationQuaternion',
+          60,
+          BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+
+        const currentRotation = camera.rotationQuaternion.clone();
+        rotationAnimation.setKeys([
+          { frame: 0, value: currentRotation },
+          { frame: ${animationFrames}, value: targetRotation },
+        ]);
+
+        rotationAnimation.setEasingFunction(easingFunction);
+
+        camera.animations = [];
+        camera.animations.push(positionAnimation);
+        camera.animations.push(rotationAnimation);
+
+        scene.beginAnimation(camera, 0, ${animationFrames}, false, 1, function () {
+          animatingToPath = false;
+          scrollPosition = startIndex;
+          scrollTarget = scrollPosition;
+        });
+      } else {
+        scrollTarget += event.deltaY * ${scrollSpeed};
+
+        if (scrollTarget < 0) scrollTarget = 0;
+        if (scrollTarget > path.length - 1) scrollTarget = path.length - 1;
+      }
+    });
+
+    // Helper function
+    function getClosestPointOnPath(position, path) {
+      let minDist = Infinity;
+      let closestIndex = 0;
+
+      for (let i = 0; i < path.length; i++) {
+        const dist = BABYLON.Vector3.DistanceSquared(position, path[i]);
+        if (dist < minDist) {
+          minDist = dist;
+          closestIndex = i;
+        }
+      }
+
+      return { index: closestIndex, distanceSquared: minDist };
+    }
+
+    // Render loop
+    engine.runRenderLoop(function () {
+      // Smoothly interpolate scrollPosition towards scrollTarget
+      const scrollInterpolationSpeed = 0.1;
+      scrollPosition += (scrollTarget - scrollPosition) * scrollInterpolationSpeed;
+
+      if (scrollPosition < 0) scrollPosition = 0;
+      if (scrollPosition > path.length - 1) scrollPosition = path.length - 1;
+
+      if (!userControl && path.length >= 1) {
+        const t = scrollPosition / (path.length - 1 || 1);
+
+        const totalSegments = waypoints.length - 1;
+        if (totalSegments >= 1) {
+          const segmentT = t * totalSegments;
+          const segmentIndex = Math.floor(segmentT);
+          const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
+          const lerpFactor = segmentT - clampedSegmentIndex;
+
+          const newPosition = path[Math.floor(scrollPosition)];
+
+          const r1 = rotations[clampedSegmentIndex];
+          const r2 = rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
+
+          const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
+
+          camera.position.copyFrom(newPosition);
+
+          if (!camera.rotationQuaternion) {
+            camera.rotationQuaternion = new BABYLON.Quaternion();
+          }
+          camera.rotationQuaternion.copyFrom(newRotation);
+        } else if (rotations.length === 1) {
+          camera.position.copyFrom(path[0]);
+          if (!camera.rotationQuaternion) {
+            camera.rotationQuaternion = new BABYLON.Quaternion();
+          }
+          camera.rotationQuaternion.copyFrom(rotations[0]);
+        }
+      }
+
+      scene.render();
+    });
+
+    // Resize
+    window.addEventListener('resize', function () {
+      engine.resize();
+    });
+
+    // User interaction detection
+    scene.onPointerObservable.add(function (evt) {
+      if (
+        evt.type === BABYLON.PointerEventTypes.POINTERDOWN ||
+        evt.type === BABYLON.PointerEventTypes.POINTERMOVE
+      ) {
+        userControl = true;
+
+        if (camera.rotationQuaternion) {
+          camera.rotation = camera.rotationQuaternion.toEulerAngles();
+          camera.rotationQuaternion = null;
+        }
+      }
+    });
+
+    window.addEventListener('keydown', function () {
+      userControl = true;
+
+      if (camera.rotationQuaternion) {
+        camera.rotation = camera.rotationQuaternion.toEulerAngles();
+        camera.rotationQuaternion = null;
+      }
+    });
+  </script>
+</body>
+</html>
+    `;
+  };
+
   return (
     <div
       style={{
@@ -696,6 +1051,10 @@ const App: React.FC = () => {
       >
         Please drag and drop a <br /> .splat or .ply file to load.
       </div>
+      {/* Waypoint Input Form */}
+      {/* ... existing UI components ... */}
+
+      {/* Include all existing UI components as before */}
       {/* Waypoint Input Form */}
       <Draggable handle=".handle">
         <div
@@ -966,7 +1325,7 @@ const App: React.FC = () => {
           )}
         </div>
       </Draggable>
-      {/* Splat Loading Buttons */}
+      {/* Splat Loading Buttons with Custom URL Input */}
       <Draggable handle=".handle">
         <div
           className="handle"
@@ -982,7 +1341,7 @@ const App: React.FC = () => {
             cursor: 'move',
           }}
         >
-          <h3 style={{ margin: '0 0 10px 0' }}>Load Default Splats</h3>
+          <h3 style={{ margin: '0 0 10px 0' }}>Load Splats</h3>
           {splats.map((splat, index) => (
             <button
               key={index}
@@ -990,6 +1349,7 @@ const App: React.FC = () => {
                 const url = baseURL + splat;
                 setLoadedSplatUrl(url);
                 if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+                setIsModelLocal(false); // Model is from URL
               }}
               style={{
                 display: 'block',
@@ -1005,8 +1365,63 @@ const App: React.FC = () => {
               {splat}
             </button>
           ))}
+          {/* Custom URL Input */}
+          <div style={{ marginTop: '10px' }}>
+            <input
+              type="text"
+              placeholder="Enter custom splat URL"
+              value={customSplatUrl}
+              onChange={(e) => setCustomSplatUrl(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '5px',
+                marginBottom: '5px',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={() => {
+                if (customSplatUrl) {
+                  setLoadedSplatUrl(customSplatUrl);
+                  if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+                  setIsModelLocal(false); // Model is from URL
+                } else {
+                  alert('Please enter a valid URL.');
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '5px 10px',
+                backgroundColor: 'green',
+                color: 'white',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Load Custom Splat
+            </button>
+          </div>
         </div>
       </Draggable>
+
+      {/* Export Button */}
+      <button
+        onClick={handleExport}
+        style={{
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          padding: '10px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+      >
+        Export Scene
+      </button>
+
       <canvas
         ref={canvasRef}
         style={{ width: '100%', height: '100%', touchAction: 'none' }}
