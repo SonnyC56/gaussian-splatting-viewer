@@ -48,8 +48,8 @@ const App: React.FC = () => {
   // State to manage the visibility of the controls info section
   const [showControlsInfo, setShowControlsInfo] = useState(true);
 
-  // State to manage the loaded splat file URL
-  const [loadedSplatUrl, setLoadedSplatUrl] = useState<string | null>(null);
+  // State to manage the loaded model file URL
+  const [loadedModelUrl, setLoadedModelUrl] = useState<string | null>(null);
 
   // State variables for adjustable parameters
   const [scrollSpeed, setScrollSpeed] = useState(0.1);
@@ -62,6 +62,9 @@ const App: React.FC = () => {
 
   // State for scroll controls visibility
   const [showScrollControls, setShowScrollControls] = useState(true);
+
+  // State for background color
+  const [backgroundColor, setBackgroundColor] = useState<string>('#000000');
 
   // Refs for scene and camera
   const sceneRef = useRef<BABYLON.Scene | null>(null);
@@ -80,7 +83,7 @@ const App: React.FC = () => {
   const animatingToPathRef = useRef<boolean>(false);
 
   // New state variables
-  const [customSplatUrl, setCustomSplatUrl] = useState<string>('');
+  const [customModelUrl, setCustomModelUrl] = useState<string>('');
   const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
 
   // Function to adjust scroll via buttons
@@ -113,6 +116,9 @@ const App: React.FC = () => {
     // Create the scene
     const scene = new BABYLON.Scene(engine);
     sceneRef.current = scene;
+
+    // Set the initial background color
+    scene.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
 
     // Check for WebXR support
     if (navigator.xr) {
@@ -165,8 +171,8 @@ const App: React.FC = () => {
     // Create a basic light
     new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
 
-    // Variables for Gaussian Splatting Mesh
-    let gsMesh: BABYLON.AbstractMesh | null = null;
+    // Variables for Loaded Meshes
+    let loadedMeshes: BABYLON.AbstractMesh[] = [];
     let isComponentMounted = true; // Flag to check if component is still mounted
 
     // Function to add hover interaction
@@ -234,12 +240,24 @@ const App: React.FC = () => {
       });
     };
 
-    // Function to load Gaussian Splatting file
-    const loadSplatFile = function (fileOrUrl: File | string) {
-      // Dispose of existing mesh
-      if (gsMesh) {
-        gsMesh.dispose();
-        gsMesh = null;
+    // Function to load model file
+    const loadModelFile = function (fileOrUrl: File | string) {
+      // Dispose of existing meshes
+      loadedMeshes.forEach((mesh) => mesh.dispose());
+      loadedMeshes = [];
+
+      const loadExtensions = ['.splat', '.ply', '.gltf', '.glb'];
+
+      let fileExtension = '';
+      if (typeof fileOrUrl === 'string') {
+        fileExtension = '.' + fileOrUrl.split('.').pop()?.toLowerCase();
+      } else {
+        fileExtension = '.' + fileOrUrl.name.split('.').pop()?.toLowerCase();
+      }
+
+      if (!loadExtensions.includes(fileExtension)) {
+        alert('Unsupported file format. Please load a .splat, .ply, .gltf, or .glb file.');
+        return;
       }
 
       if (typeof fileOrUrl === 'string') {
@@ -247,11 +265,13 @@ const App: React.FC = () => {
         BABYLON.SceneLoader.ImportMeshAsync('', '', fileOrUrl, scene)
           .then((result) => {
             if (!isComponentMounted) return; // Prevent setting state if unmounted
-            gsMesh = result.meshes[0];
-            gsMesh.position = BABYLON.Vector3.Zero();
-
-            // Add hover interaction to the mesh
-            addHoverInteraction(gsMesh);
+            loadedMeshes = result.meshes;
+            loadedMeshes.forEach((mesh) => {
+              if (mesh instanceof BABYLON.Mesh) {
+                mesh.position = BABYLON.Vector3.Zero();
+                addHoverInteraction(mesh);
+              }
+            });
 
             // Hide the info text
             if (infoTextRef.current) infoTextRef.current.style.display = 'none';
@@ -259,14 +279,11 @@ const App: React.FC = () => {
             setIsModelLocal(false); // Model is from URL
           })
           .catch((error) => {
-            console.error('Error loading splat file:', error);
-            alert('Error loading splat file: ' + error.message);
+            console.error('Error loading model file:', error);
+            alert('Error loading model file: ' + error.message);
           });
       } else {
         // Load from File
-        const fileExtension =
-          '.' + fileOrUrl.name.split('.').pop()?.toLowerCase();
-
         // Pass the File object directly to the loader
         BABYLON.SceneLoader.ImportMeshAsync(
           null,
@@ -278,11 +295,13 @@ const App: React.FC = () => {
         )
           .then((result) => {
             if (!isComponentMounted) return; // Prevent setting state if unmounted
-            gsMesh = result.meshes[0];
-            gsMesh.position = BABYLON.Vector3.Zero();
-
-            // Add hover interaction to the mesh
-            addHoverInteraction(gsMesh);
+            loadedMeshes = result.meshes;
+            loadedMeshes.forEach((mesh) => {
+              if (mesh instanceof BABYLON.Mesh) {
+                mesh.position = BABYLON.Vector3.Zero();
+                addHoverInteraction(mesh);
+              }
+            });
 
             // Hide the info text
             if (infoTextRef.current) infoTextRef.current.style.display = 'none';
@@ -290,15 +309,15 @@ const App: React.FC = () => {
             setIsModelLocal(true); // Model is from local file
           })
           .catch((error) => {
-            console.error('Error loading splat file:', error);
-            alert('Error loading splat file: ' + error.message);
+            console.error('Error loading model file:', error);
+            alert('Error loading model file: ' + error.message);
           });
       }
     };
 
-    // Load splat if URL is provided
-    if (loadedSplatUrl) {
-      loadSplatFile(loadedSplatUrl);
+    // Load model if URL is provided
+    if (loadedModelUrl) {
+      loadModelFile(loadedModelUrl);
     }
 
     // Drag-and-Drop Functionality
@@ -317,10 +336,10 @@ const App: React.FC = () => {
       if (files && files.length > 0) {
         const file = files[0];
         const ext = file.name.split('.').pop()?.toLowerCase();
-        if (ext === 'splat' || ext === 'ply') {
-          loadSplatFile(file);
+        if (ext === 'splat' || ext === 'ply' || ext === 'gltf' || ext === 'glb') {
+          loadModelFile(file);
         } else {
-          alert('Please drop a .splat or .ply file.');
+          alert('Please drop a .splat, .ply, .gltf, or .glb file.');
         }
       }
     };
@@ -626,12 +645,20 @@ const App: React.FC = () => {
     };
   }, [
     waypoints,
-    loadedSplatUrl,
+    loadedModelUrl,
     scrollSpeed,
     animationFrames,
     cameraMovementSpeed,
     cameraRotationSensitivity,
+    backgroundColor, // Include backgroundColor in dependencies
   ]); // Re-run effect when dependencies change
+
+  // Effect to update background color when it changes
+  useEffect(() => {
+    if (sceneRef.current) {
+      sceneRef.current.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
+    }
+  }, [backgroundColor]);
 
   // Function to handle waypoint input changes
   const handleWaypointChange = (
@@ -670,9 +697,9 @@ const App: React.FC = () => {
     setWaypoints(newWaypoints);
   };
 
-  // List of default splats
+  // List of default models
   const baseURL = 'https://assets.babylonjs.com/splats/';
-  const splats = [
+  const models = [
     'gs_Sqwakers_trimed.splat',
     'gs_Skull.splat',
     'gs_Plants.splat',
@@ -681,15 +708,15 @@ const App: React.FC = () => {
 
   // Function to handle exporting the scene
   const handleExport = async () => {
-    let splatUrl = loadedSplatUrl || customSplatUrl;
+    let modelUrl = loadedModelUrl || customModelUrl;
 
     if (isModelLocal) {
       // Prompt the user for a hosted URL
-      splatUrl = prompt(
+      modelUrl = prompt(
         'Please provide a URL where the model is hosted:',
         ''
       ) ?? '';
-      if (!splatUrl) {
+      if (!modelUrl) {
         alert('Export cancelled. You must provide a URL for the model.');
         return;
       }
@@ -701,7 +728,7 @@ const App: React.FC = () => {
     );
 
     // Generate the HTML content
-    const htmlContent = generateExportedHTML(splatUrl, includeUI);
+    const htmlContent = generateExportedHTML(modelUrl, includeUI);
 
     // Create a blob and trigger download
     const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -715,7 +742,7 @@ const App: React.FC = () => {
   };
 
   // Function to generate the exported HTML
-  const generateExportedHTML = (splatUrl: string, includeUI: boolean) => {
+  const generateExportedHTML = (modelUrl: string, includeUI: boolean) => {
     // Prepare the waypoints and rotations data
     const waypointsData = waypoints.map((wp) => ({
       x: wp.x,
@@ -781,6 +808,9 @@ const App: React.FC = () => {
 
     // Create the scene
     const scene = new BABYLON.Scene(engine);
+
+    // Set the background color
+    scene.clearColor = BABYLON.Color3.FromHexString('${backgroundColor}').toColor4(1);
 
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera(
@@ -876,18 +906,20 @@ const App: React.FC = () => {
       });
     };
 
-    // Load the splat file
-    BABYLON.SceneLoader.ImportMeshAsync('', '', '${splatUrl}', scene)
+    // Load the model file
+    BABYLON.SceneLoader.ImportMeshAsync('', '', '${modelUrl}', scene)
       .then((result) => {
-        const gsMesh = result.meshes[0];
-        gsMesh.position = BABYLON.Vector3.Zero();
-
-        // Add hover interaction
-        addHoverInteraction(gsMesh);
+        const loadedMeshes = result.meshes;
+        loadedMeshes.forEach((mesh) => {
+          if (mesh instanceof BABYLON.Mesh) {
+            mesh.position = BABYLON.Vector3.Zero();
+            addHoverInteraction(mesh);
+          }
+        });
       })
       .catch((error) => {
-        console.error('Error loading splat file:', error);
-        alert('Error loading splat file: ' + error.message);
+        console.error('Error loading model file:', error);
+        alert('Error loading model file: ' + error.message);
       });
 
     // Prepare waypoints and rotations
@@ -1118,7 +1150,7 @@ const App: React.FC = () => {
           zIndex: 5,
         }}
       >
-        Please drag and drop a <br /> .splat or .ply file to load.
+        Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
       </div>
       {/* Waypoint Input Form */}
       {/* ... existing UI components ... */}
@@ -1411,12 +1443,12 @@ const App: React.FC = () => {
           }}
         >
           <h3 style={{ margin: '0 0 10px 0' }}>Load Splats</h3>
-          {splats.map((splat, index) => (
+          {models.map((splat, index) => (
             <button
               key={index}
               onClick={() => {
                 const url = baseURL + splat;
-                setLoadedSplatUrl(url);
+                setLoadedModelUrl(url);
                 if (infoTextRef.current) infoTextRef.current.style.display = 'none';
                 setIsModelLocal(false); // Model is from URL
               }}
@@ -1439,8 +1471,8 @@ const App: React.FC = () => {
             <input
               type="text"
               placeholder="Enter custom splat URL"
-              value={customSplatUrl}
-              onChange={(e) => setCustomSplatUrl(e.target.value)}
+              value={customModelUrl}
+              onChange={(e) => setCustomModelUrl(e.target.value)}
               style={{
                 width: '100%',
                 padding: '5px',
@@ -1450,8 +1482,8 @@ const App: React.FC = () => {
             />
             <button
               onClick={() => {
-                if (customSplatUrl) {
-                  setLoadedSplatUrl(customSplatUrl);
+                if (customModelUrl) {
+                  setLoadedModelUrl(customModelUrl);
                   if (infoTextRef.current) infoTextRef.current.style.display = 'none';
                   setIsModelLocal(false); // Model is from URL
                 } else {
