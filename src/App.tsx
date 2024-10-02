@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
-import './App.css';
-import * as BABYLON from '@babylonjs/core';
-import '@babylonjs/loaders';
-import '@babylonjs/core/Loading/sceneLoader';
-import Draggable from 'react-draggable';
+import React, { useRef, useEffect, useState } from "react";
+import "./App.css";
+import * as BABYLON from "@babylonjs/core";
+import "@babylonjs/loaders";
+import "@babylonjs/core/Loading/sceneLoader";
+import Draggable from "react-draggable";
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -55,7 +55,8 @@ const App: React.FC = () => {
   const [scrollSpeed, setScrollSpeed] = useState(0.1);
   const [animationFrames, setAnimationFrames] = useState(120);
   const [cameraMovementSpeed, setCameraMovementSpeed] = useState(0.2);
-  const [cameraRotationSensitivity, setCameraRotationSensitivity] = useState(4000);
+  const [cameraRotationSensitivity, setCameraRotationSensitivity] =
+    useState(4000);
 
   // State for scroll percentage
   const [scrollPercentage, setScrollPercentage] = useState(0);
@@ -64,7 +65,7 @@ const App: React.FC = () => {
   const [showScrollControls, setShowScrollControls] = useState(true);
 
   // State for background color
-  const [backgroundColor, setBackgroundColor] = useState<string>('#7D7D7D');
+  const [backgroundColor, setBackgroundColor] = useState<string>("#7D7D7D");
 
   // Refs for scene and camera
   const sceneRef = useRef<BABYLON.Scene | null>(null);
@@ -83,7 +84,7 @@ const App: React.FC = () => {
   const animatingToPathRef = useRef<boolean>(false);
 
   // New state variables
-  const [customModelUrl, setCustomModelUrl] = useState<string>('');
+  const [customModelUrl, setCustomModelUrl] = useState<string>("");
   const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
 
   // Function to adjust scroll via buttons
@@ -118,27 +119,28 @@ const App: React.FC = () => {
     sceneRef.current = scene;
 
     // Set the initial background color
-    scene.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
+    scene.clearColor =
+      BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
 
     // Check for WebXR support
     if (navigator.xr) {
-      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+      navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
         if (supported) {
           // Enable WebXR support
           scene.createDefaultXRExperienceAsync().then(() => {
-            console.log('WebXR enabled');
+            console.log("WebXR enabled");
           });
         } else {
-          console.warn('immersive-vr mode is not supported in this browser.');
+          console.warn("immersive-vr mode is not supported in this browser.");
         }
       });
     } else {
-      console.warn('WebXR is not supported in this browser.');
+      console.warn("WebXR is not supported in this browser.");
     }
 
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera(
-      'camera',
+      "camera",
       new BABYLON.Vector3(waypoints[0].x, waypoints[0].y, waypoints[0].z),
       scene
     );
@@ -158,7 +160,7 @@ const App: React.FC = () => {
     // Enable gamepad control
     const gamepadManager = scene.gamepadManager;
     gamepadManager.onGamepadConnectedObservable.add((gamepad) => {
-      console.log('Gamepad connected: ' + gamepad.id);
+      console.log("Gamepad connected: " + gamepad.id);
       if (gamepad instanceof BABYLON.GenericPad) {
         // Handle standard gamepads
         gamepad.onleftstickchanged((values) => {
@@ -169,7 +171,7 @@ const App: React.FC = () => {
     });
 
     // Create a basic light
-    new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), scene);
+    new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
 
     // Variables for Loaded Meshes
     let loadedMeshes: BABYLON.AbstractMesh[] = [];
@@ -187,25 +189,25 @@ const App: React.FC = () => {
           BABYLON.ActionManager.OnPointerOverTrigger,
           () => {
             // Show tooltip
-            tooltip = document.createElement('div');
-            tooltip.id = 'tooltip';
-            tooltip.innerText = 'Hot spot example';
-            tooltip.style.position = 'absolute';
-            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            tooltip.style.color = 'white';
-            tooltip.style.padding = '5px';
-            tooltip.style.borderRadius = '5px';
-            tooltip.style.pointerEvents = 'none';
-            tooltip.style.zIndex = '15';
+            tooltip = document.createElement("div");
+            tooltip.id = "tooltip";
+            tooltip.innerText = "Hot spot example";
+            tooltip.style.position = "absolute";
+            tooltip.style.backgroundColor = "rgba(0,0,0,0.7)";
+            tooltip.style.color = "white";
+            tooltip.style.padding = "5px";
+            tooltip.style.borderRadius = "5px";
+            tooltip.style.pointerEvents = "none";
+            tooltip.style.zIndex = "15";
             document.body.appendChild(tooltip);
 
             pointerMoveHandler = function (evt) {
               if (tooltip) {
-                tooltip.style.left = evt.clientX + 10 + 'px';
-                tooltip.style.top = evt.clientY + 10 + 'px';
+                tooltip.style.left = evt.clientX + 10 + "px";
+                tooltip.style.top = evt.clientY + 10 + "px";
               }
             };
-            window.addEventListener('pointermove', pointerMoveHandler);
+            window.addEventListener("pointermove", pointerMoveHandler);
           }
         )
       );
@@ -220,7 +222,7 @@ const App: React.FC = () => {
               tooltip = null;
             }
             if (pointerMoveHandler) {
-              window.removeEventListener('pointermove', pointerMoveHandler);
+              window.removeEventListener("pointermove", pointerMoveHandler);
               pointerMoveHandler = null;
             }
           }
@@ -234,7 +236,7 @@ const App: React.FC = () => {
           tooltip = null;
         }
         if (pointerMoveHandler) {
-          window.removeEventListener('pointermove', pointerMoveHandler);
+          window.removeEventListener("pointermove", pointerMoveHandler);
           pointerMoveHandler = null;
         }
       });
@@ -246,23 +248,25 @@ const App: React.FC = () => {
       loadedMeshes.forEach((mesh) => mesh.dispose());
       loadedMeshes = [];
 
-      const loadExtensions = ['.splat', '.ply', '.gltf', '.glb'];
+      const loadExtensions = [".splat", ".ply", ".gltf", ".glb"];
 
-      let fileExtension = '';
-      if (typeof fileOrUrl === 'string') {
-        fileExtension = '.' + fileOrUrl.split('.').pop()?.toLowerCase();
+      let fileExtension = "";
+      if (typeof fileOrUrl === "string") {
+        fileExtension = "." + fileOrUrl.split(".").pop()?.toLowerCase();
       } else {
-        fileExtension = '.' + fileOrUrl.name.split('.').pop()?.toLowerCase();
+        fileExtension = "." + fileOrUrl.name.split(".").pop()?.toLowerCase();
       }
 
       if (!loadExtensions.includes(fileExtension)) {
-        alert('Unsupported file format. Please load a .splat, .ply, .gltf, or .glb file.');
+        alert(
+          "Unsupported file format. Please load a .splat, .ply, .gltf, or .glb file."
+        );
         return;
       }
 
-      if (typeof fileOrUrl === 'string') {
+      if (typeof fileOrUrl === "string") {
         // Load from URL
-        BABYLON.SceneLoader.ImportMeshAsync('', '', fileOrUrl, scene)
+        BABYLON.SceneLoader.ImportMeshAsync("", "", fileOrUrl, scene)
           .then((result) => {
             if (!isComponentMounted) return; // Prevent setting state if unmounted
             loadedMeshes = result.meshes;
@@ -274,20 +278,20 @@ const App: React.FC = () => {
             });
 
             // Hide the info text
-            if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+            if (infoTextRef.current) infoTextRef.current.style.display = "none";
 
             setIsModelLocal(false); // Model is from URL
           })
           .catch((error) => {
-            console.error('Error loading model file:', error);
-            alert('Error loading model file: ' + error.message);
+            console.error("Error loading model file:", error);
+            alert("Error loading model file: " + error.message);
           });
       } else {
         // Load from File
         // Pass the File object directly to the loader
         BABYLON.SceneLoader.ImportMeshAsync(
           null,
-          '',
+          "",
           fileOrUrl,
           scene,
           null,
@@ -304,13 +308,13 @@ const App: React.FC = () => {
             });
 
             // Hide the info text
-            if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+            if (infoTextRef.current) infoTextRef.current.style.display = "none";
 
             setIsModelLocal(true); // Model is from local file
           })
           .catch((error) => {
-            console.error('Error loading model file:', error);
-            alert('Error loading model file: ' + error.message);
+            console.error("Error loading model file:", error);
+            alert("Error loading model file: " + error.message);
           });
       }
     };
@@ -335,18 +339,23 @@ const App: React.FC = () => {
 
       if (files && files.length > 0) {
         const file = files[0];
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        if (ext === 'splat' || ext === 'ply' || ext === 'gltf' || ext === 'glb') {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        if (
+          ext === "splat" ||
+          ext === "ply" ||
+          ext === "gltf" ||
+          ext === "glb"
+        ) {
           loadModelFile(file);
         } else {
-          alert('Please drop a .splat, .ply, .gltf, or .glb file.');
+          alert("Please drop a .splat, .ply, .gltf, or .glb file.");
         }
       }
     };
 
     // Add event listeners
-    document.addEventListener('dragover', preventDefault, false);
-    document.addEventListener('drop', handleDrop, false);
+    document.addEventListener("dragover", preventDefault, false);
+    document.addEventListener("drop", handleDrop, false);
 
     // Camera Path Setup
     // Convert waypoints to BABYLON.Vector3 and rotations
@@ -403,7 +412,7 @@ const App: React.FC = () => {
         (camera as any).rotationQuaternion = null; // Use type assertion to assign null
       }
     };
-    window.addEventListener('keydown', keydownHandler);
+    window.addEventListener("keydown", keydownHandler);
 
     // Handle scroll events to move the camera along the path or animate it back
     const wheelHandler = (event: WheelEvent) => {
@@ -441,15 +450,13 @@ const App: React.FC = () => {
           const totalSegments = waypoints.length - 1;
           const segmentT = t * totalSegments;
           const segmentIndex = Math.floor(segmentT);
-          const clampedSegmentIndex = Math.min(
-            segmentIndex,
-            totalSegments - 1
-          );
+          const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
           const lerpFactor = segmentT - clampedSegmentIndex;
 
           const r1 = rotations[clampedSegmentIndex];
           const r2 =
-            rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
+            rotations[clampedSegmentIndex + 1] ||
+            rotations[rotations.length - 1];
           targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
         } else if (rotations.length === 1) {
           targetRotation = rotations[0];
@@ -457,8 +464,8 @@ const App: React.FC = () => {
 
         // Create an animation for position
         const positionAnimation = new BABYLON.Animation(
-          'cameraPositionAnimation',
-          'position',
+          "cameraPositionAnimation",
+          "position",
           60,
           BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -466,19 +473,24 @@ const App: React.FC = () => {
 
         const positionKeys = [];
         positionKeys.push({ frame: 0, value: camera.position.clone() });
-        positionKeys.push({ frame: animationFrames, value: targetPosition.clone() });
+        positionKeys.push({
+          frame: animationFrames,
+          value: targetPosition.clone(),
+        });
 
         positionAnimation.setKeys(positionKeys);
 
         // Add easing function
         const easingFunction = new BABYLON.CubicEase();
-        easingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+        easingFunction.setEasingMode(
+          BABYLON.EasingFunction.EASINGMODE_EASEINOUT
+        );
         positionAnimation.setEasingFunction(easingFunction);
 
         // Create an animation for rotationQuaternion
         const rotationAnimation = new BABYLON.Animation(
-          'cameraRotationAnimation',
-          'rotationQuaternion',
+          "cameraRotationAnimation",
+          "rotationQuaternion",
           60,
           BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -513,7 +525,7 @@ const App: React.FC = () => {
           scrollTargetRef.current = pathRef.current.length - 1;
       }
     };
-    window.addEventListener('wheel', wheelHandler);
+    window.addEventListener("wheel", wheelHandler);
 
     // Helper function to find the closest point on the path to the camera
     function getClosestPointOnPath(
@@ -543,8 +555,10 @@ const App: React.FC = () => {
       event.preventDefault();
     };
 
-    canvas.addEventListener('wheel', preventCanvasScroll, { passive: false });
-    canvas.addEventListener('touchmove', preventCanvasTouchMove, { passive: false });
+    canvas.addEventListener("wheel", preventCanvasScroll, { passive: false });
+    canvas.addEventListener("touchmove", preventCanvasTouchMove, {
+      passive: false,
+    });
 
     // Register a render loop to repeatedly render the scene
     engine.runRenderLoop(function () {
@@ -621,23 +635,23 @@ const App: React.FC = () => {
     const resizeHandler = () => {
       engine.resize();
     };
-    window.addEventListener('resize', resizeHandler);
+    window.addEventListener("resize", resizeHandler);
 
     // Cleanup on component unmount
     return () => {
       isComponentMounted = false; // Update the flag
       // Remove event listeners
-      document.removeEventListener('dragover', preventDefault, false);
-      document.removeEventListener('drop', handleDrop, false);
-      window.removeEventListener('keydown', keydownHandler);
-      window.removeEventListener('wheel', wheelHandler);
-      window.removeEventListener('resize', resizeHandler);
+      document.removeEventListener("dragover", preventDefault, false);
+      document.removeEventListener("drop", handleDrop, false);
+      window.removeEventListener("keydown", keydownHandler);
+      window.removeEventListener("wheel", wheelHandler);
+      window.removeEventListener("resize", resizeHandler);
 
       scene.onPointerObservable.remove(pointerObservable);
 
       // Remove the event listeners from the canvas
-      canvas.removeEventListener('wheel', preventCanvasScroll);
-      canvas.removeEventListener('touchmove', preventCanvasTouchMove);
+      canvas.removeEventListener("wheel", preventCanvasScroll);
+      canvas.removeEventListener("touchmove", preventCanvasTouchMove);
 
       // Dispose of the scene and engine
       scene.dispose();
@@ -656,14 +670,15 @@ const App: React.FC = () => {
   // Effect to update background color when it changes
   useEffect(() => {
     if (sceneRef.current) {
-      sceneRef.current.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
+      sceneRef.current.clearColor =
+        BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
     }
   }, [backgroundColor]);
 
   // Function to handle waypoint input changes
   const handleWaypointChange = (
     index: number,
-    axis: 'x' | 'y' | 'z',
+    axis: "x" | "y" | "z",
     value: string
   ) => {
     const newWaypoints = [...waypoints];
@@ -698,12 +713,12 @@ const App: React.FC = () => {
   };
 
   // List of default models
-  const baseURL = 'https://assets.babylonjs.com/splats/';
+  const baseURL = "https://assets.babylonjs.com/splats/";
   const models = [
-    'gs_Sqwakers_trimed.splat',
-    'gs_Skull.splat',
-    'gs_Plants.splat',
-    'gs_Fire_Pit.splat',
+    "gs_Sqwakers_trimed.splat",
+    "gs_Skull.splat",
+    "gs_Plants.splat",
+    "gs_Fire_Pit.splat",
   ];
 
   // Function to handle exporting the scene
@@ -712,31 +727,29 @@ const App: React.FC = () => {
 
     if (isModelLocal) {
       // Prompt the user for a hosted URL
-      modelUrl = prompt(
-        'Please provide a URL where the model is hosted:',
-        ''
-      ) ?? '';
+      modelUrl =
+        prompt("Please provide a URL where the model is hosted:", "") ?? "";
       if (!modelUrl) {
-        alert('Export cancelled. You must provide a URL for the model.');
+        alert("Export cancelled. You must provide a URL for the model.");
         return;
       }
     }
 
     // Ask the user whether to include the controls UI
     const includeUI = window.confirm(
-      'Do you want to include the controls UI in the exported HTML?'
+      "Do you want to include the controls UI in the exported HTML?"
     );
 
     // Generate the HTML content
     const htmlContent = generateExportedHTML(modelUrl, includeUI);
 
     // Create a blob and trigger download
-    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blob = new Blob([htmlContent], { type: "text/html" });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'exported_scene.html';
+    a.download = "exported_scene.html";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -780,7 +793,7 @@ const App: React.FC = () => {
       z-index: 10;
     }
     `
-        : ''
+        : ""
     }
   </style>
 </head>
@@ -794,7 +807,7 @@ const App: React.FC = () => {
     <p>Scroll to move along the path.</p>
   </div>
   `
-      : ''
+      : ""
   }
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -815,7 +828,9 @@ const App: React.FC = () => {
     // Create a universal camera and position it
     const camera = new BABYLON.UniversalCamera(
       'camera',
-      new BABYLON.Vector3(${waypoints[0].x}, ${waypoints[0].y}, ${waypoints[0].z}),
+      new BABYLON.Vector3(${waypoints[0].x}, ${waypoints[0].y}, ${
+      waypoints[0].z
+    }),
       scene
     );
     camera.attachControl(canvas, true);
@@ -1130,23 +1145,23 @@ const App: React.FC = () => {
   return (
     <div
       style={{
-        width: '100vw',
-        height: '100vh',
-        position: 'relative',
-        overflow: 'hidden',
+        width: "100vw",
+        height: "100vh",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       {/* Drag and Drop Info Text */}
       <div
         ref={infoTextRef}
         style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          color: 'white',
-          fontSize: '24px',
-          textAlign: 'center',
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          color: "white",
+          fontSize: "24px",
+          textAlign: "center",
           zIndex: 5,
         }}
       >
@@ -1161,25 +1176,25 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            bottom: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            bottom: "10px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            maxHeight: '50vh',
-            overflowY: 'auto',
-            cursor: 'move',
+            maxHeight: "50vh",
+            overflowY: "auto",
+            cursor: "move",
           }}
         >
-          <h3 style={{ margin: '0 0 10px 0', textAlign: 'center' }}>
+          <h3 style={{ margin: "0 0 10px 0", textAlign: "center" }}>
             Edit Waypoints
           </h3>
           {waypoints.map((wp, index) => (
-            <div key={index} style={{ marginBottom: '5px' }}>
+            <div key={index} style={{ marginBottom: "5px" }}>
               <span>Waypoint {index + 1}: </span>
               <label>
                 X:
@@ -1188,44 +1203,44 @@ const App: React.FC = () => {
                   step="0.1"
                   value={wp.x}
                   onChange={(e) =>
-                    handleWaypointChange(index, 'x', e.target.value)
+                    handleWaypointChange(index, "x", e.target.value)
                   }
-                  style={{ width: '60px', marginLeft: '5px' }}
+                  style={{ width: "60px", marginLeft: "5px" }}
                 />
               </label>
-              <label style={{ marginLeft: '10px' }}>
+              <label style={{ marginLeft: "10px" }}>
                 Y:
                 <input
                   type="number"
                   step="0.1"
                   value={wp.y}
                   onChange={(e) =>
-                    handleWaypointChange(index, 'y', e.target.value)
+                    handleWaypointChange(index, "y", e.target.value)
                   }
-                  style={{ width: '60px', marginLeft: '5px' }}
+                  style={{ width: "60px", marginLeft: "5px" }}
                 />
               </label>
-              <label style={{ marginLeft: '10px' }}>
+              <label style={{ marginLeft: "10px" }}>
                 Z:
                 <input
                   type="number"
                   step="0.1"
                   value={wp.z}
                   onChange={(e) =>
-                    handleWaypointChange(index, 'z', e.target.value)
+                    handleWaypointChange(index, "z", e.target.value)
                   }
-                  style={{ width: '60px', marginLeft: '5px' }}
+                  style={{ width: "60px", marginLeft: "5px" }}
                 />
               </label>
               {waypoints.length > 1 && (
                 <button
                   onClick={() => removeWaypoint(index)}
                   style={{
-                    marginLeft: '10px',
-                    backgroundColor: 'red',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
+                    marginLeft: "10px",
+                    backgroundColor: "red",
+                    color: "white",
+                    border: "none",
+                    cursor: "pointer",
                   }}
                 >
                   Delete
@@ -1236,12 +1251,12 @@ const App: React.FC = () => {
           <button
             onClick={addWaypoint}
             style={{
-              marginTop: '10px',
-              padding: '5px 10px',
-              backgroundColor: 'green',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
+              marginTop: "10px",
+              padding: "5px 10px",
+              backgroundColor: "green",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
             }}
           >
             Add Waypoint at Current Position
@@ -1253,40 +1268,42 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            cursor: 'move',
+            cursor: "move",
           }}
         >
           <button
             onClick={() => setShowControlsInfo(!showControlsInfo)}
             style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '16px',
-              cursor: 'pointer',
+              backgroundColor: "transparent",
+              border: "none",
+              color: "white",
+              fontSize: "16px",
+              cursor: "pointer",
             }}
           >
-            {showControlsInfo ? 'Hide Controls' : 'Show Controls'}
+            {showControlsInfo ? "Hide Controls" : "Show Controls"}
           </button>
           {showControlsInfo && (
-            <div style={{ marginTop: '10px' }}>
+            <div style={{ marginTop: "10px" }}>
               <p>
                 <strong>Controls:</strong>
               </p>
-              <ul style={{ paddingLeft: '20px', margin: '5px 0' }}>
+              <ul style={{ paddingLeft: "20px", margin: "5px 0" }}>
                 <li>W/A/S/D: Move camera</li>
                 <li>Mouse: Look around</li>
                 <li>Scroll: Move along path</li>
                 <li>Drag and drop a .splat or .ply file to load</li>
-                <li>Click "Add Waypoint at Current Position" to add waypoint</li>
+                <li>
+                  Click "Add Waypoint at Current Position" to add waypoint
+                </li>
               </ul>
             </div>
           )}
@@ -1297,19 +1314,19 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            bottom: '10px', // Moved to bottom left corner
-            left: '10px',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            bottom: "10px", // Moved to bottom left corner
+            left: "10px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            cursor: 'move',
+            cursor: "move",
           }}
         >
-          <h3 style={{ margin: '0 0 10px 0' }}>Adjust Parameters</h3>
-          <div style={{ marginBottom: '10px' }}>
+          <h3 style={{ margin: "0 0 10px 0" }}>Adjust Parameters</h3>
+          <div style={{ marginBottom: "10px" }}>
             <label>
               Scroll Speed:
               <input
@@ -1317,11 +1334,11 @@ const App: React.FC = () => {
                 step="0.01"
                 value={scrollSpeed}
                 onChange={(e) => setScrollSpeed(parseFloat(e.target.value))}
-                style={{ width: '60px', marginLeft: '5px' }}
+                style={{ width: "60px", marginLeft: "5px" }}
               />
             </label>
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: "10px" }}>
             <label>
               Animation Frames:
               <input
@@ -1331,11 +1348,11 @@ const App: React.FC = () => {
                 onChange={(e) =>
                   setAnimationFrames(parseInt(e.target.value, 10))
                 }
-                style={{ width: '60px', marginLeft: '5px' }}
+                style={{ width: "60px", marginLeft: "5px" }}
               />
             </label>
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: "10px" }}>
             <label>
               Camera Speed:
               <input
@@ -1345,11 +1362,11 @@ const App: React.FC = () => {
                 onChange={(e) =>
                   setCameraMovementSpeed(parseFloat(e.target.value))
                 }
-                style={{ width: '60px', marginLeft: '5px' }}
+                style={{ width: "60px", marginLeft: "5px" }}
               />
             </label>
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div style={{ marginBottom: "10px" }}>
             <label>
               Camera Rotation Sensitivity:
               <input
@@ -1359,7 +1376,7 @@ const App: React.FC = () => {
                 onChange={(e) =>
                   setCameraRotationSensitivity(parseFloat(e.target.value))
                 }
-                style={{ width: '60px', marginLeft: '5px' }}
+                style={{ width: "60px", marginLeft: "5px" }}
               />
             </label>
           </div>
@@ -1370,42 +1387,44 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            top: '50%',
-            right: '10px',
-            transform: 'translateY(-50%)',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            top: "50%",
+            right: "10px",
+            transform: "translateY(-50%)",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            cursor: 'move',
+            cursor: "move",
           }}
         >
           <button
             onClick={() => setShowScrollControls(!showScrollControls)}
             style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '16px',
-              cursor: 'pointer',
+              backgroundColor: "transparent",
+              border: "none",
+              color: "white",
+              fontSize: "16px",
+              cursor: "pointer",
             }}
           >
-            {showScrollControls ? 'Hide Scroll Controls' : 'Show Scroll Controls'}
+            {showScrollControls
+              ? "Hide Scroll Controls"
+              : "Show Scroll Controls"}
           </button>
           {showScrollControls && (
-            <div style={{ marginTop: '10px' }}>
+            <div style={{ marginTop: "10px" }}>
               <p>Scroll Position: {Math.round(scrollPercentage)}%</p>
               <button
                 onClick={() => adjustScroll(-1)}
                 style={{
-                  marginRight: '5px',
-                  padding: '5px 10px',
-                  backgroundColor: '#555',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
+                  marginRight: "5px",
+                  padding: "5px 10px",
+                  backgroundColor: "#555",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
                 Backward
@@ -1413,11 +1432,11 @@ const App: React.FC = () => {
               <button
                 onClick={() => adjustScroll(1)}
                 style={{
-                  padding: '5px 10px',
-                  backgroundColor: '#555',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
+                  padding: "5px 10px",
+                  backgroundColor: "#555",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
                 Forward
@@ -1431,72 +1450,74 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            top: '10px',
-            left: '250px',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            top: "10px",
+            left: "250px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            cursor: 'move',
+            cursor: "move",
           }}
         >
-          <h3 style={{ margin: '0 0 10px 0' }}>Load Splats</h3>
+          <h3 style={{ margin: "0 0 10px 0" }}>Load Splats</h3>
           {models.map((splat, index) => (
             <button
               key={index}
               onClick={() => {
                 const url = baseURL + splat;
                 setLoadedModelUrl(url);
-                if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+                if (infoTextRef.current)
+                  infoTextRef.current.style.display = "none";
                 setIsModelLocal(false); // Model is from URL
               }}
               style={{
-                display: 'block',
-                marginBottom: '5px',
-                padding: '5px 10px',
-                backgroundColor: '#555',
-                color: 'white',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
+                display: "block",
+                marginBottom: "5px",
+                padding: "5px 10px",
+                backgroundColor: "#555",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
               }}
             >
               {splat}
             </button>
           ))}
           {/* Custom URL Input */}
-          <div style={{ marginTop: '10px' }}>
+          <div style={{ marginTop: "10px" }}>
             <input
               type="text"
               placeholder="Enter custom splat URL"
               value={customModelUrl}
               onChange={(e) => setCustomModelUrl(e.target.value)}
               style={{
-                width: '100%',
-                padding: '5px',
-                marginBottom: '5px',
-                boxSizing: 'border-box',
+                width: "100%",
+                padding: "5px",
+                marginBottom: "5px",
+                boxSizing: "border-box",
               }}
             />
             <button
               onClick={() => {
                 if (customModelUrl) {
                   setLoadedModelUrl(customModelUrl);
-                  if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+                  if (infoTextRef.current)
+                    infoTextRef.current.style.display = "none";
                   setIsModelLocal(false); // Model is from URL
                 } else {
-                  alert('Please enter a valid URL.');
+                  alert("Please enter a valid URL.");
                 }
               }}
               style={{
-                width: '100%',
-                padding: '5px 10px',
-                backgroundColor: 'green',
-                color: 'white',
-                border: 'none',
-                cursor: 'pointer',
+                width: "100%",
+                padding: "5px 10px",
+                backgroundColor: "green",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
               }}
             >
               Load Custom Splat
@@ -1510,23 +1531,28 @@ const App: React.FC = () => {
         <div
           className="handle"
           style={{
-            position: 'absolute',
-            top: '10px',
-            left: '10px',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            padding: '10px',
-            borderRadius: '5px',
-            color: 'white',
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "white",
             zIndex: 10,
-            cursor: 'move',
+            cursor: "move",
           }}
         >
-          <h3 style={{ margin: '0 0 10px 0' }}>Background Color</h3>
+          <h3 style={{ margin: "0 0 10px 0" }}>Background Color</h3>
           <input
             type="color"
             value={backgroundColor}
             onChange={(e) => setBackgroundColor(e.target.value)}
-            style={{ width: '100%', height: '40px', border: 'none', cursor: 'pointer' }}
+            style={{
+              width: "100%",
+              height: "40px",
+              border: "none",
+              cursor: "pointer",
+            }}
           />
         </div>
       </Draggable>
@@ -1535,24 +1561,49 @@ const App: React.FC = () => {
       <button
         onClick={handleExport}
         style={{
-          position: 'absolute',
-          top: '10px',
-          left: '10px', // Adjusted to not overlap with Background Color Selector
-          padding: '10px',
-          backgroundColor: '#007bff',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer',
+          position: "absolute",
+          top: "10px",
+          left: "10px", // Adjusted to not overlap with Background Color Selector
+          padding: "10px",
+          backgroundColor: "#007bff",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
           zIndex: 10,
-          marginTop: '120px', // Adjusted to position below Background Color Selector
+          marginTop: "120px", // Adjusted to position below Background Color Selector
         }}
       >
         Export Scene
       </button>
-
+      {/* GitHub link to repository */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "10px",
+          right: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          padding: "5px 10px",
+          borderRadius: "5px",
+          color: "white",
+          fontSize: "12px",
+          zIndex: 10,
+        }}
+      >
+        <a
+          href="https://github.com/SonnyC56/gaussian-splatting-viewer"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "white",
+            textDecoration: "none",
+          }}
+        >
+          Go to Git Repo
+        </a>
+      </div>
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: '100%', touchAction: 'none' }}
+        style={{ width: "100%", height: "100%", touchAction: "none" }}
       />
     </div>
   );
