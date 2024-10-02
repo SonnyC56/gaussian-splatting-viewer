@@ -1505,19 +1505,46 @@ const App: React.FC = () => {
         </div>
       </Draggable>
 
+      {/* Background Color Selector */}
+      <Draggable handle=".handle">
+        <div
+          className="handle"
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            padding: '10px',
+            borderRadius: '5px',
+            color: 'white',
+            zIndex: 10,
+            cursor: 'move',
+          }}
+        >
+          <h3 style={{ margin: '0 0 10px 0' }}>Background Color</h3>
+          <input
+            type="color"
+            value={backgroundColor}
+            onChange={(e) => setBackgroundColor(e.target.value)}
+            style={{ width: '100%', height: '40px', border: 'none', cursor: 'pointer' }}
+          />
+        </div>
+      </Draggable>
+
       {/* Export Button */}
       <button
         onClick={handleExport}
         style={{
           position: 'absolute',
           top: '10px',
-          left: '10px',
+          left: '10px', // Adjusted to not overlap with Background Color Selector
           padding: '10px',
           backgroundColor: '#007bff',
           color: 'white',
           border: 'none',
           cursor: 'pointer',
           zIndex: 10,
+          marginTop: '120px', // Adjusted to position below Background Color Selector
         }}
       >
         Export Scene
