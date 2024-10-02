@@ -6,19 +6,52 @@ import '@babylonjs/core/Loading/sceneLoader';
 
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const infoTextRef = useRef<HTMLDivElement | null>(null);
 
-  // State to hold waypoint coordinates
-  const [waypoints, setWaypoints] = useState([
-    { x: 0, y: 0, z: -10 },
-    { x: 0, y: 0, z: -8 },
-    { x: 0, y: 0, z: -6 },
-    { x: 0, y: 0, z: -4 },
-    { x: 0, y: 0, z: -2 },
+  // State to hold waypoint coordinates and rotations
+  const [waypoints, setWaypoints] = useState<
+    { x: number; y: number; z: number; rotation: BABYLON.Quaternion }[]
+  >([
+    {
+      x: 0,
+      y: 0,
+      z: -10,
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0),
+    },
+    {
+      x: 0,
+      y: 0,
+      z: -8,
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0),
+    },
+    {
+      x: 0,
+      y: 0,
+      z: -6,
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0),
+    },
+    {
+      x: 0,
+      y: 0,
+      z: -4,
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0),
+    },
+    {
+      x: 0,
+      y: 0,
+      z: -2,
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0),
+    },
   ]);
 
   // State to manage the visibility of the controls info section
   const [showControlsInfo, setShowControlsInfo] = useState(true);
+
+  // State to manage the loaded splat file URL
+  const [loadedSplatUrl, setLoadedSplatUrl] = useState<string | null>(null);
+
+  // State to manage the scene and camera references
+  const sceneRef = useRef<BABYLON.Scene | null>(null);
+  const cameraRef = useRef<BABYLON.UniversalCamera | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -31,6 +64,7 @@ const App: React.FC = () => {
 
     // Create the scene
     const scene = new BABYLON.Scene(engine);
+    sceneRef.current = scene;
 
     // Check for WebXR support
     if (navigator.xr) {
@@ -54,6 +88,7 @@ const App: React.FC = () => {
       new BABYLON.Vector3(waypoints[0].x, waypoints[0].y, waypoints[0].z),
       scene
     );
+    cameraRef.current = camera;
     camera.attachControl(canvas, true);
 
     // Adjust camera sensitivity
@@ -87,82 +122,113 @@ const App: React.FC = () => {
     let isComponentMounted = true; // Flag to check if component is still mounted
 
     // Function to load Gaussian Splatting file
-    const loadSplatFile = function (file: File) {
+    const loadSplatFile = function (fileOrUrl: File | string) {
       // Dispose of existing mesh
       if (gsMesh) {
         gsMesh.dispose();
         gsMesh = null;
       }
 
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (typeof fileOrUrl === 'string') {
+        // Load from URL
+        BABYLON.SceneLoader.ImportMeshAsync(
+          '',
+          '',
+          fileOrUrl,
+          scene
+        )
+          .then((result) => {
+            if (!isComponentMounted) return; // Prevent setting state if unmounted
+            gsMesh = result.meshes[0];
+            gsMesh.position = BABYLON.Vector3.Zero();
 
-      // Pass the File object directly to the loader
-      BABYLON.SceneLoader.ImportMeshAsync(
-        null,
-        '',
-        file,
-        scene,
-        null,
-        fileExtension
-      )
-        .then((result) => {
-          if (!isComponentMounted) return; // Prevent setting state if unmounted
-          gsMesh = result.meshes[0];
-          gsMesh.position = BABYLON.Vector3.Zero();
-          if (infoTextRef.current) infoTextRef.current.style.display = 'none';
+            // Add hover interaction to the mesh
+            addHoverInteraction(gsMesh);
+          })
+          .catch((error) => {
+            console.error('Error loading splat file:', error);
+            alert('Error loading splat file: ' + error.message);
+          });
+      } else {
+        // Load from File
+        const fileExtension = '.' + fileOrUrl.name.split('.').pop()?.toLowerCase();
 
-          // Add hover interaction to the mesh
-          gsMesh.actionManager = new BABYLON.ActionManager(scene);
+        // Pass the File object directly to the loader
+        BABYLON.SceneLoader.ImportMeshAsync(
+          null,
+          '',
+          fileOrUrl,
+          scene,
+          null,
+          fileExtension
+        )
+          .then((result) => {
+            if (!isComponentMounted) return; // Prevent setting state if unmounted
+            gsMesh = result.meshes[0];
+            gsMesh.position = BABYLON.Vector3.Zero();
 
-          gsMesh.actionManager.registerAction(
-            new BABYLON.ExecuteCodeAction(
-              BABYLON.ActionManager.OnPointerOverTrigger,
-              () => {
-                // Show tooltip
-                const tooltip = document.createElement('div');
-                tooltip.id = 'tooltip';
-                tooltip.innerText = 'Hot spot example';
-                tooltip.style.position = 'absolute';
-                tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
-                tooltip.style.color = 'white';
-                tooltip.style.padding = '5px';
-                tooltip.style.borderRadius = '5px';
-                tooltip.style.pointerEvents = 'none';
-                tooltip.style.zIndex = '15';
-                document.body.appendChild(tooltip);
+            // Add hover interaction to the mesh
+            addHoverInteraction(gsMesh);
+          })
+          .catch((error) => {
+            console.error('Error loading splat file:', error);
+            alert('Error loading splat file: ' + error.message);
+          });
+      }
+    };
 
-                scene.onPointerMove = function (evt) {
-                  if (tooltip) {
-                    tooltip.style.left = evt.clientX + 10 + 'px';
-                    tooltip.style.top = evt.clientY + 10 + 'px';
-                  }
-                };
+    // Load splat if URL is provided
+    if (loadedSplatUrl) {
+      loadSplatFile(loadedSplatUrl);
+    }
+
+    // Function to add hover interaction
+    const addHoverInteraction = (mesh: BABYLON.AbstractMesh) => {
+      mesh.actionManager = new BABYLON.ActionManager(scene);
+
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOverTrigger,
+          () => {
+            // Show tooltip
+            const tooltip = document.createElement('div');
+            tooltip.id = 'tooltip';
+            tooltip.innerText = 'Hot spot example';
+            tooltip.style.position = 'absolute';
+            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '5px';
+            tooltip.style.borderRadius = '5px';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '15';
+            document.body.appendChild(tooltip);
+
+            scene.onPointerMove = function (evt) {
+              if (tooltip) {
+                tooltip.style.left = evt.clientX + 10 + 'px';
+                tooltip.style.top = evt.clientY + 10 + 'px';
               }
-            )
-          );
+            };
+          }
+        )
+      );
 
-          gsMesh.actionManager.registerAction(
-            new BABYLON.ExecuteCodeAction(
-              BABYLON.ActionManager.OnPointerOutTrigger,
-              () => {
-                // Hide tooltip
-                const tooltip = document.getElementById('tooltip');
-                if (tooltip) {
-                  tooltip.remove();
-                }
-                scene.onPointerMove = undefined; // Assign undefined to remove the handler
-              }
-            )
-          );
-        })
-        .catch((error) => {
-          console.error('Error loading splat file:', error);
-          alert('Error loading splat file: ' + error.message);
-        });
+      mesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOutTrigger,
+          () => {
+            // Hide tooltip
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip) {
+              tooltip.remove();
+            }
+            scene.onPointerMove = undefined; // Assign undefined to remove the handler
+          }
+        )
+      );
     };
 
     // Drag-and-Drop Functionality
-    const infoText = infoTextRef.current;
 
     // Event handlers
     const preventDefault = (e: Event) => {
@@ -180,7 +246,6 @@ const App: React.FC = () => {
         const ext = file.name.split('.').pop()?.toLowerCase();
         if (ext === 'splat' || ext === 'ply') {
           loadSplatFile(file);
-          if (infoText) infoText.style.display = 'none';
         } else {
           alert('Please drop a .splat or .ply file.');
         }
@@ -192,17 +257,19 @@ const App: React.FC = () => {
     document.addEventListener('drop', handleDrop, false);
 
     // Camera Path Setup
-    // Convert waypoints to BABYLON.Vector3
+    // Convert waypoints to BABYLON.Vector3 and rotations
     const controlPoints = waypoints.map(
       (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
     );
+    const rotations = waypoints.map((wp) => wp.rotation);
 
-    const curve = BABYLON.Curve3.CreateCatmullRomSpline(
+    // Create paths for position and rotation
+    const positionCurve = BABYLON.Curve3.CreateCatmullRomSpline(
       controlPoints,
-      100,
+      (waypoints.length - 1) * 10,
       false
-    ); // Open spline
-    const path = curve.getPoints();
+    );
+    const path = positionCurve.getPoints();
 
     // Variables to manage camera control state
     let scrollPosition = 0;
@@ -265,27 +332,17 @@ const App: React.FC = () => {
         // Compute the desired position
         const targetPosition = path[startIndex];
 
-        // Compute the tangent at the closest point
-        let direction: BABYLON.Vector3;
-        if (startIndex < path.length - 1) {
-          direction = path[startIndex + 1]
-            .subtract(path[startIndex])
-            .normalize();
-        } else if (startIndex > 0) {
-          direction = path[startIndex]
-            .subtract(path[startIndex - 1])
-            .normalize();
-        } else {
-          direction = new BABYLON.Vector3(0, 0, 1);
-        }
+        // Get the corresponding rotation
+        const t = startIndex / (path.length - 1);
+        const totalSegments = waypoints.length - 1;
+        const segmentT = t * totalSegments;
+        const segmentIndex = Math.floor(segmentT);
+        const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
+        const lerpFactor = segmentT - clampedSegmentIndex;
 
-        // Invert the direction vector
-        direction = direction.negate();
-
-        // Compute the desired rotation quaternion
-        const up = BABYLON.Vector3.Up();
-        const desiredRotation =
-          BABYLON.Quaternion.FromLookDirectionLH(direction, up);
+        const r1 = rotations[clampedSegmentIndex];
+        const r2 = rotations[clampedSegmentIndex + 1];
+        const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
 
         // Create an animation for position
         const positionAnimation = new BABYLON.Animation(
@@ -311,14 +368,11 @@ const App: React.FC = () => {
           BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
         );
 
-        const rotationKeys = [];
-        rotationKeys.push({
-          frame: 0,
-          value: camera.rotationQuaternion!.clone(),
-        });
-        rotationKeys.push({ frame: 60, value: desiredRotation });
-
-        rotationAnimation.setKeys(rotationKeys);
+        const currentRotation = camera.rotationQuaternion!.clone();
+        rotationAnimation.setKeys([
+          { frame: 0, value: currentRotation },
+          { frame: 60, value: targetRotation },
+        ]);
 
         // Add animations to the camera
         camera.animations = [];
@@ -342,40 +396,38 @@ const App: React.FC = () => {
         }
 
         // Move the camera along the path based on scroll position
-        scrollPosition += event.deltaY;
+        scrollPosition += event.deltaY * 0.1;
 
         // Clamp scrollPosition to the path length
         if (scrollPosition < 0) scrollPosition = 0;
         if (scrollPosition > path.length - 1)
           scrollPosition = path.length - 1;
 
+        // Calculate t based on scrollPosition
         const t = scrollPosition / (path.length - 1);
 
-        const index = Math.floor(t * (path.length - 1));
-        const nextIndex = Math.min(index + 1, path.length - 1);
+        // Calculate segment index and lerp factor
+        const totalSegments = waypoints.length - 1;
+        if (totalSegments <= 0) return; // Need at least two waypoints
 
-        const p1 = path[index];
-        const p2 = path[nextIndex];
+        const segmentT = t * totalSegments;
+        const segmentIndex = Math.floor(segmentT);
+        const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
+        const lerpFactor = segmentT - clampedSegmentIndex;
 
-        const lerpFactor = (t * (path.length - 1)) % 1;
+        // Interpolate position along the path
+        const newPosition = path[Math.floor(scrollPosition)];
 
-        const newPosition = BABYLON.Vector3.Lerp(p1, p2, lerpFactor);
+        // Interpolate rotations
+        const r1 = rotations[clampedSegmentIndex];
+        const r2 = rotations[clampedSegmentIndex + 1];
+
+        const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
 
         camera.position.copyFrom(newPosition);
 
-        // Compute the tangent vector for the path segment
-        let direction = p2.subtract(p1).normalize();
-
-        // Invert the direction vector
-        direction = direction.negate();
-
-        // Compute the desired rotation quaternion
-        const up = BABYLON.Vector3.Up();
-        const desiredRotation =
-          BABYLON.Quaternion.FromLookDirectionLH(direction, up);
-
         // Set the camera's rotationQuaternion
-        camera.rotationQuaternion!.copyFrom(desiredRotation);
+        camera.rotationQuaternion!.copyFrom(newRotation);
       }
     };
     window.addEventListener('wheel', wheelHandler);
@@ -428,7 +480,7 @@ const App: React.FC = () => {
       scene.dispose();
       engine.dispose();
     };
-  }, [waypoints]); // Re-run effect when waypoints change
+  }, [waypoints, loadedSplatUrl]); // Re-run effect when waypoints or loaded splat URL change
 
   // Function to handle waypoint input changes
   const handleWaypointChange = (
@@ -441,6 +493,41 @@ const App: React.FC = () => {
     setWaypoints(newWaypoints);
   };
 
+  // Function to add a new waypoint
+  const addWaypoint = () => {
+    const camera = cameraRef.current;
+    if (camera) {
+      const newWaypoint = {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z,
+        rotation: camera.rotationQuaternion
+          ? camera.rotationQuaternion.clone()
+          : BABYLON.Quaternion.FromEulerAngles(
+              camera.rotation.x,
+              camera.rotation.y,
+              camera.rotation.z
+            ),
+      };
+      setWaypoints([...waypoints, newWaypoint]);
+    }
+  };
+
+  // Function to remove a waypoint
+  const removeWaypoint = (index: number) => {
+    const newWaypoints = waypoints.filter((_, i) => i !== index);
+    setWaypoints(newWaypoints);
+  };
+
+  // List of default splats
+  const baseURL = 'https://assets.babylonjs.com/splats/';
+  const splats = [
+    'gs_Sqwakers_trimed.splat',
+    'gs_Skull.splat',
+    'gs_Plants.splat',
+    'gs_Fire_Pit.splat',
+  ];
+
   return (
     <div
       style={{
@@ -450,21 +537,6 @@ const App: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      <div
-        ref={infoTextRef}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          color: 'white',
-          fontSize: '24px',
-          textAlign: 'center',
-          zIndex: 5,
-        }}
-      >
-        Please drag and drop a <br /> .splat or .ply file to load.
-      </div>
       {/* Waypoint Input Form */}
       <div
         style={{
@@ -477,6 +549,8 @@ const App: React.FC = () => {
           borderRadius: '5px',
           color: 'white',
           zIndex: 10,
+          maxHeight: '50vh',
+          overflowY: 'auto',
         }}
       >
         <h3 style={{ margin: '0 0 10px 0', textAlign: 'center' }}>
@@ -521,8 +595,35 @@ const App: React.FC = () => {
                 style={{ width: '60px', marginLeft: '5px' }}
               />
             </label>
+            {waypoints.length > 1 && (
+              <button
+                onClick={() => removeWaypoint(index)}
+                style={{
+                  marginLeft: '10px',
+                  backgroundColor: 'red',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Delete
+              </button>
+            )}
           </div>
         ))}
+        <button
+          onClick={addWaypoint}
+          style={{
+            marginTop: '10px',
+            padding: '5px 10px',
+            backgroundColor: 'green',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          Add Waypoint at Current Position
+        </button>
       </div>
       {/* Controls Info Section */}
       <div
@@ -559,9 +660,46 @@ const App: React.FC = () => {
               <li>Mouse: Look around</li>
               <li>Scroll: Move along path</li>
               <li>Drag and drop a .splat or .ply file to load</li>
+              <li>Click "Add Waypoint at Current Position" to add waypoint</li>
             </ul>
           </div>
         )}
+      </div>
+      {/* Splat Loading Buttons */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '10px',
+          left: '10px',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: '10px',
+          borderRadius: '5px',
+          color: 'white',
+          zIndex: 10,
+        }}
+      >
+        <h3 style={{ margin: '0 0 10px 0' }}>Load Default Splats</h3>
+        {splats.map((splat, index) => (
+          <button
+            key={index}
+            onClick={() => {
+              const url = baseURL + splat;
+              setLoadedSplatUrl(url);
+            }}
+            style={{
+              display: 'block',
+              marginBottom: '5px',
+              padding: '5px 10px',
+              backgroundColor: '#555',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            {splat}
+          </button>
+        ))}
       </div>
       <canvas
         ref={canvasRef}
