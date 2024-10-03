@@ -389,10 +389,7 @@ const App: React.FC = () => {
 
     // Detect user interaction to enable free camera control
     const pointerObservable = scene.onPointerObservable.add(function (evt) {
-      if (
-        evt.type === BABYLON.PointerEventTypes.POINTERDOWN ||
-        evt.type === BABYLON.PointerEventTypes.POINTERMOVE
-      ) {
+      if (evt.type === BABYLON.PointerEventTypes.POINTERDOWN) {
         userControlRef.current = true;
 
         // Switch to Euler angles (rotation) when user takes control
@@ -1116,8 +1113,7 @@ const App: React.FC = () => {
     // User interaction detection
     scene.onPointerObservable.add(function (evt) {
       if (
-        evt.type === BABYLON.PointerEventTypes.POINTERDOWN ||
-        evt.type === BABYLON.PointerEventTypes.POINTERMOVE
+        evt.type === BABYLON.PointerEventTypes.POINTERDOWN 
       ) {
         userControl = true;
 
