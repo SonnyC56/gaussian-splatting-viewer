@@ -1,15 +1,15 @@
 import React from "react";
 import Draggable from "react-draggable";
 import * as BABYLON from "@babylonjs/core";
+import { Waypoint } from "../App";
 
-interface WaypointControlsProps {
-  waypoints: { x: number; y: number; z: number; rotation: BABYLON.Quaternion }[];
-  setWaypoints: React.Dispatch<
-    React.SetStateAction<
-      { x: number; y: number; z: number; rotation: BABYLON.Quaternion }[]
-    >
-  >;
-}
+
+// Update WaypointControls Component
+type WaypointControlsProps = {
+  waypoints: Waypoint[];
+  setWaypoints: React.Dispatch<React.SetStateAction<Waypoint[]>>;
+};
+
 
 const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypoints }) => {
   const handleWaypointChange = (
@@ -28,6 +28,8 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
       y: 0,
       z: 0,
       rotation: BABYLON.Quaternion.Identity(),
+      interactions: [],
+      triggered: false,
     };
     setWaypoints([...waypoints, newWaypoint]);
   };

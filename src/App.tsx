@@ -14,44 +14,65 @@ import GitHubLink from "./components/GithubCTA";
 import { generateExportedHTML } from "./tools/GenerateExportedHtml";
 import loadModelFile from "./tools/LoadModelFile";
 import { wheelHandler } from "./tools/WheelHandler";
-
+export interface Interaction {
+  id: string; // Unique identifier for the interaction
+  type: 'audio' | 'info' | 'animation' | 'custom'; // Supported interaction types
+  data: any; // Interaction-specific data
+}
+export interface Waypoint {
+  x: number;
+  y: number;
+  z: number;
+  rotation: BABYLON.Quaternion;
+  interactions: Interaction[]; // Array of interactions
+  triggered: boolean; // To track if interactions have been triggered
+}
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const infoTextRef = useRef<HTMLDivElement | null>(null);
+  
 
   // State to hold waypoint coordinates and rotations
-  const [waypoints, setWaypoints] = useState<
-    { x: number; y: number; z: number; rotation: BABYLON.Quaternion }[]
-  >([
+  const [waypoints, setWaypoints] = useState<Waypoint[]>([
     {
       x: 0,
       y: 0,
       z: -10,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0),
+      interactions: [],
+      triggered: false,
     },
     {
       x: 0,
       y: 0,
       z: -8,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0),
+      interactions: [],
+      triggered: false,
     },
     {
       x: 0,
       y: 0,
       z: -6,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0),
+      interactions: [],
+      triggered: false,
     },
     {
       x: 0,
       y: 0,
       z: -4,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0),
+      interactions: [],
+      triggered: false,
     },
     {
       x: 0,
       y: 0,
       z: -2,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0),
+      interactions: [],
+      triggered: false,
     },
   ]);
 
