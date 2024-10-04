@@ -74,7 +74,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
         </div>
         <div style={{ marginBottom: "10px" }}>
           <label>
-            Camera Speed:
+            Camera Fly Speed:
             <input
               type="number"
               step="0.01"

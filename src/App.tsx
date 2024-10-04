@@ -17,6 +17,7 @@ import InfoPopup from "./components/InfoPopup"; // Importing InfoPopup
 import { generateExportedHTML } from "./tools/GenerateExportedHtml";
 import loadModelFile from "./tools/LoadModelFile";
 import { wheelHandler } from "./tools/WheelHandler";
+import WaypointVisualizer from './components/WaypointVisualizer';
 
 // Define cookie keys
 const COOKIE_KEYS = {
@@ -124,6 +125,8 @@ const App: React.FC = () => {
     DEFAULT_SETTINGS.cameraRotationSensitivity
   );
 
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
   // State for scroll percentage
   const [scrollPercentage, setScrollPercentage] = useState<number>(0);
 
@@ -160,8 +163,9 @@ const App: React.FC = () => {
   const activeAudioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
   const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
 
-  // Define vertical movement speed
-  const verticalMovementSpeed = 0.5; // Adjust as needed
+//loaded meshes ref 
+const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
+
 
   // Track active waypoints in the buffer zone
   const activeWaypointsRef = useRef<Set<number>>(new Set());
@@ -307,14 +311,17 @@ const App: React.FC = () => {
 
     // Load model if URL is provided
     if (loadedModelUrl) {
-      loadModelFile(
+       const loadedMeshes =   loadModelFile(
         loadedModelUrl,
-        loadedMeshes,
+        loadedMeshesRef.current,
         scene,
         isComponentMounted,
         setIsModelLocal,
         infoTextRef
       );
+      if(loadedMeshes){
+          loadedMeshesRef.current = loadedMeshes;
+      }
     }
 
     // Drag-and-Drop Functionality
@@ -339,14 +346,17 @@ const App: React.FC = () => {
           ext === "gltf" ||
           ext === "glb"
         ) {
-          loadModelFile(
+        const loadedMeshes =  loadModelFile(
             file,
-            loadedMeshes,
+            loadedMeshesRef.current,
             scene,
             isComponentMounted,
             setIsModelLocal,
             infoTextRef
           );
+          if(loadedMeshes){
+              loadedMeshesRef.current = loadedMeshes;
+          }
         } else {
           alert("Please drop a .splat, .ply, .gltf, or .glb file.");
         }
@@ -464,7 +474,7 @@ const App: React.FC = () => {
         setScrollPercentage(newScrollPercentage);
 
         // Only update camera position if not animating back to path
-        if (!userControlRef.current && pathRef.current.length >= 1) {
+        if (!userControlRef.current && pathRef.current.length >= 1  && !isEditMode) {
           // Calculate t based on scrollPosition
           const t =
             scrollPositionRef.current / (pathRef.current.length - 1 || 1); // Avoid division by zero
@@ -563,14 +573,74 @@ const App: React.FC = () => {
       engine.dispose();
     };
   }, [
-    waypoints,
-    loadedModelUrl,
     scrollSpeed,
     animationFrames,
-    cameraMovementSpeed,
-    cameraRotationSensitivity,
-    backgroundColor,
   ]); // Re-run effect when dependencies change
+
+//useEffect for loadedModelUrl
+useEffect(() => {
+
+  //dispose of old meshes
+  console.log("Disposing old meshes: ", loadedMeshesRef.current);
+   sceneRef.current?.meshes.forEach(mesh => mesh.dispose());
+ 
+
+  if (loadedModelUrl && sceneRef.current) {
+  const loadedModels =  loadModelFile(
+      loadedModelUrl,
+      loadedMeshesRef.current,
+      sceneRef.current,
+      true,
+      setIsModelLocal,
+      infoTextRef
+    );
+    if(loadedModels){
+        loadedMeshesRef.current = loadedModels;
+    }
+
+  }
+}, [loadedModelUrl]);
+
+//useEffect for cameraRotationSensitivity
+useEffect(() => {
+  if (cameraRef.current) {
+    cameraRef.current.angularSensibility = cameraRotationSensitivity;
+  }
+}
+, [cameraRotationSensitivity]);
+
+//useEffect for cameraMovementSpeed
+useEffect(() => {
+  if (cameraRef.current) {
+    cameraRef.current.speed = cameraMovementSpeed;
+  }
+} , [cameraMovementSpeed]);
+
+
+ // Update waypoints
+ useEffect(() => {
+  if (!sceneRef.current) return;
+
+  // Update path and rotations
+  const controlPoints = waypoints.map(wp => new BABYLON.Vector3(wp.x, wp.y, wp.z));
+  const rotations = waypoints.map(wp => wp.rotation);
+
+  let path: BABYLON.Vector3[] = [];
+  if (controlPoints.length >= 2) {
+    const positionCurve = BABYLON.Curve3.CreateCatmullRomSpline(
+      controlPoints,
+      (waypoints.length - 1) * 10,
+      false
+    );
+    path = positionCurve.getPoints();
+  } else if (controlPoints.length === 1) {
+    path = [controlPoints[0]];
+  }
+
+  pathRef.current = path;
+  rotationsRef.current = rotations;
+
+}, [waypoints]);
 
   // Effect to update background color when it changes
   useEffect(() => {
@@ -793,6 +863,16 @@ const App: React.FC = () => {
         setBackgroundColor={setBackgroundColor}
       />
       <GitHubLink repoUrl="https://github.com/SonnyC56/gaussian-splatting-viewer" />
+
+      {sceneRef.current && (
+        <WaypointVisualizer
+          scene={sceneRef.current}
+          waypoints={waypoints}
+          setWaypoints={setWaypoints}
+          isEditMode={isEditMode}
+         />
+       )}
+
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100%", touchAction: "none" }}
@@ -805,6 +885,11 @@ const App: React.FC = () => {
           onClose={() => setInfoPopupText(null)}
         />
       )}
+      <div style={{ position: 'absolute', top: '10px', left: '50%', zIndex: 10 }}>
+        <button onClick={() => setIsEditMode(!isEditMode)}>
+          {isEditMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
+        </button>
+      </div>
     </div>
   );
 };

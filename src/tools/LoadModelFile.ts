@@ -78,6 +78,7 @@ import addTooltipToMesh from "./AddToolTipToMesh";
               alert("Error loading model file: " + error.message);
             });
         }
+        return loadedMeshes;
       };
 
       export default loadModelFile;
