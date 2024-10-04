@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import "./App.css";
 import * as BABYLON from "@babylonjs/core";
 import "@babylonjs/loaders";
@@ -421,23 +421,6 @@ const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
     };
     window.addEventListener("keydown", keydownHandlerInternal);
 
-    // Handle scroll events to move the camera along the path or animate it back
-    const wheelHandlerLocal = (event: WheelEvent) => {
-      wheelHandler(
-        event,
-        animatingToPathRef,
-        userControlRef,
-        camera,
-        pathRef,
-        rotations,
-        waypoints,
-        animationFrames,
-        scrollSpeed,
-        scrollTargetRef,
-        scrollPositionRef
-      );
-    };
-    window.addEventListener("wheel", wheelHandlerLocal);
     // Prevent default scrolling behavior on the canvas
     const preventCanvasScroll = (event: Event) => {
       event.preventDefault();
@@ -572,10 +555,34 @@ const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
       scene.dispose();
       engine.dispose();
     };
-  }, [
-    scrollSpeed,
-    animationFrames,
-  ]); // Re-run effect when dependencies change
+  }, []); // Re-run effect when dependencies change
+
+
+  const wheelHandlerLocal = useCallback((event: WheelEvent) => {
+    if(cameraRef.current){
+    wheelHandler(
+      event,
+      animatingToPathRef,
+      userControlRef,
+      cameraRef.current,
+      pathRef,
+      rotationsRef.current,
+      waypoints,
+      animationFrames,
+      scrollSpeed,
+      scrollTargetRef,
+      scrollPositionRef,
+      isEditMode
+    );
+  }
+  }, [waypoints, animationFrames, scrollSpeed, isEditMode]);
+
+  useEffect(() => {
+    window.addEventListener("wheel", wheelHandlerLocal);
+    return () => {
+      window.removeEventListener("wheel", wheelHandlerLocal);
+    };
+  }, [wheelHandlerLocal]);
 
 //useEffect for loadedModelUrl
 useEffect(() => {

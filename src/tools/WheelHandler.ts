@@ -13,9 +13,12 @@ export const wheelHandler = (
   animationFrames: number,
   scrollSpeed: number,
   scrollTargetRef: MutableRefObject<number>,
-  scrollPositionRef: MutableRefObject<number>
+  scrollPositionRef: MutableRefObject<number>,
+  isEditMode: boolean
 ) => {
   if (animatingToPathRef.current) return;
+
+  if(isEditMode) return;
 
   if (userControlRef.current) {
     // Animate the camera back to the path
@@ -133,6 +136,7 @@ export const wheelHandler = (
       scrollPositionRef.current = startIndex;
       scrollTargetRef.current = scrollPositionRef.current;
     });
+  
   } else {
     // Adjust scrollTarget instead of scrollPosition directly
     scrollTargetRef.current += event.deltaY * scrollSpeed;
