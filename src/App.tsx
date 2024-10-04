@@ -1,36 +1,78 @@
+// src/App.tsx
 import React, { useRef, useEffect, useState } from "react";
 import "./App.css";
 import * as BABYLON from "@babylonjs/core";
 import "@babylonjs/loaders";
+import Cookies from "js-cookie"; // Importing js-cookie
 
 import WaypointControls from "./components/WaypointControls";
 import ParameterControls from "./components/ParameterControls";
 import ScrollControls from "./components/ScrollControls";
 import Controls from "./components/Controls";
-import SplatLoader from "./components/SplatLoader";
+import LoadSaveExportMenu from "./components/LoadSaveExportMenu";
 import BackgroundColorSelector from "./components/BackgroundColorSelector";
-import ExportButton from "./components/ExportButton";
 import GitHubLink from "./components/GithubCTA";
+import InfoPopup from "./components/InfoPopup"; // Importing InfoPopup
+
 import { generateExportedHTML } from "./tools/GenerateExportedHtml";
 import loadModelFile from "./tools/LoadModelFile";
 import { wheelHandler } from "./tools/WheelHandler";
+
+// Define cookie keys
+const COOKIE_KEYS = {
+  scrollSpeed: "scrollSpeed",
+  animationFrames: "animationFrames",
+  cameraMovementSpeed: "cameraMovementSpeed",
+  cameraRotationSensitivity: "cameraRotationSensitivity",
+  backgroundColor: "backgroundColor",
+  // Add more keys if needed
+};
+
+// Define default settings
+const DEFAULT_SETTINGS = {
+  scrollSpeed: 0.1,
+  animationFrames: 120,
+  cameraMovementSpeed: 0.2,
+  cameraRotationSensitivity: 4000,
+  backgroundColor: "#7D7D7D",
+};
+
+// Type Definitions
 export interface Interaction {
   id: string; // Unique identifier for the interaction
-  type: 'audio' | 'info' | 'animation' | 'custom'; // Supported interaction types
+  type: "audio" | "info" | "animation" | "custom"; // Supported interaction types
   data: any; // Interaction-specific data
 }
+
 export interface Waypoint {
   x: number;
   y: number;
   z: number;
   rotation: BABYLON.Quaternion;
   interactions: Interaction[]; // Array of interactions
-  triggered: boolean; // To track if interactions have been triggered
 }
+
+export interface AudioInteractionData {
+  url: string; // URL of the audio file to play
+}
+
+export interface InfoInteractionData {
+  text: string; // Text to display in the info pop-up
+}
+
+export interface AnimationInteractionData {
+  animationName: string; // Name of the animation to trigger
+  // Add additional properties as needed
+}
+
+export interface CustomInteractionData {
+  script: string; // Custom JavaScript code to execute
+  // Add additional properties as needed
+}
+
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const infoTextRef = useRef<HTMLDivElement | null>(null);
-  
 
   // State to hold waypoint coordinates and rotations
   const [waypoints, setWaypoints] = useState<Waypoint[]>([
@@ -40,7 +82,6 @@ const App: React.FC = () => {
       z: -10,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0),
       interactions: [],
-      triggered: false,
     },
     {
       x: 0,
@@ -48,7 +89,6 @@ const App: React.FC = () => {
       z: -8,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0),
       interactions: [],
-      triggered: false,
     },
     {
       x: 0,
@@ -56,7 +96,6 @@ const App: React.FC = () => {
       z: -6,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0),
       interactions: [],
-      triggered: false,
     },
     {
       x: 0,
@@ -64,7 +103,6 @@ const App: React.FC = () => {
       z: -4,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0),
       interactions: [],
-      triggered: false,
     },
     {
       x: 0,
@@ -72,30 +110,28 @@ const App: React.FC = () => {
       z: -2,
       rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0),
       interactions: [],
-      triggered: false,
     },
   ]);
-
-
 
   // State to manage the loaded model file URL
   const [loadedModelUrl, setLoadedModelUrl] = useState<string | null>(null);
 
   // State variables for adjustable parameters
-  const [scrollSpeed, setScrollSpeed] = useState(0.1);
-  const [animationFrames, setAnimationFrames] = useState(120);
-  const [cameraMovementSpeed, setCameraMovementSpeed] = useState(0.2);
-  const [cameraRotationSensitivity, setCameraRotationSensitivity] =
-    useState(4000);
+  const [scrollSpeed, setScrollSpeed] = useState<number>(DEFAULT_SETTINGS.scrollSpeed);
+  const [animationFrames, setAnimationFrames] = useState<number>(DEFAULT_SETTINGS.animationFrames);
+  const [cameraMovementSpeed, setCameraMovementSpeed] = useState<number>(DEFAULT_SETTINGS.cameraMovementSpeed);
+  const [cameraRotationSensitivity, setCameraRotationSensitivity] = useState<number>(
+    DEFAULT_SETTINGS.cameraRotationSensitivity
+  );
 
   // State for scroll percentage
-  const [scrollPercentage, setScrollPercentage] = useState(0);
+  const [scrollPercentage, setScrollPercentage] = useState<number>(0);
 
   // State for scroll controls visibility
-  const [showScrollControls, setShowScrollControls] = useState(true);
+  const [showScrollControls, setShowScrollControls] = useState<boolean>(true);
 
   // State for background color
-  const [backgroundColor, setBackgroundColor] = useState<string>("#7D7D7D");
+  const [backgroundColor, setBackgroundColor] = useState<string>(DEFAULT_SETTINGS.backgroundColor);
 
   // Refs for scene and camera
   const sceneRef = useRef<BABYLON.Scene | null>(null);
@@ -117,6 +153,28 @@ const App: React.FC = () => {
   const [customModelUrl, setCustomModelUrl] = useState<string>("");
   const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
 
+  // State for Info Popup
+  const [infoPopupText, setInfoPopupText] = useState<string | null>(null);
+
+  // Refs to track active interactions
+  const activeAudioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+  const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
+
+  // Define vertical movement speed
+  const verticalMovementSpeed = 0.5; // Adjust as needed
+
+  // Track active waypoints in the buffer zone
+  const activeWaypointsRef = useRef<Set<number>>(new Set());
+
+  // Define reset settings function
+  const resetSettings = () => {
+    setScrollSpeed(DEFAULT_SETTINGS.scrollSpeed);
+    setAnimationFrames(DEFAULT_SETTINGS.animationFrames);
+    setCameraMovementSpeed(DEFAULT_SETTINGS.cameraMovementSpeed);
+    setCameraRotationSensitivity(DEFAULT_SETTINGS.cameraRotationSensitivity);
+    setBackgroundColor(DEFAULT_SETTINGS.backgroundColor);
+  };
+
   // Function to adjust scroll via buttons
   const adjustScroll = (direction: number) => {
     const increment = 10; // Percentage increment
@@ -127,13 +185,52 @@ const App: React.FC = () => {
 
       // Clamp scrollTarget to valid range
       if (scrollTargetRef.current < 0) scrollTargetRef.current = 0;
-      if (scrollTargetRef.current > pathLength - 1)
-        scrollTargetRef.current = pathLength - 1;
+      if (scrollTargetRef.current > pathRef.current.length - 1)
+        scrollTargetRef.current = pathRef.current.length - 1;
 
       // Reset userControl to allow camera movement along the path
       userControlRef.current = false;
     }
   };
+
+  // Load settings from cookies on mount
+  useEffect(() => {
+    // Load settings from cookies or use default values
+    const savedScrollSpeed = parseFloat(Cookies.get(COOKIE_KEYS.scrollSpeed) || "0.1");
+    const savedAnimationFrames = parseInt(Cookies.get(COOKIE_KEYS.animationFrames) || "120");
+    const savedCameraMovementSpeed = parseFloat(Cookies.get(COOKIE_KEYS.cameraMovementSpeed) || "0.2");
+    const savedCameraRotationSensitivity = parseFloat(Cookies.get(COOKIE_KEYS.cameraRotationSensitivity) || "4000");
+    const savedBackgroundColor = Cookies.get(COOKIE_KEYS.backgroundColor) || "#7D7D7D";
+
+    // Update state with saved settings
+    setScrollSpeed(savedScrollSpeed);
+    setAnimationFrames(savedAnimationFrames);
+    setCameraMovementSpeed(savedCameraMovementSpeed);
+    setCameraRotationSensitivity(savedCameraRotationSensitivity);
+    setBackgroundColor(savedBackgroundColor);
+  }, []);
+
+  // Save settings to cookies when they change
+  useEffect(() => {
+    Cookies.set(COOKIE_KEYS.scrollSpeed, scrollSpeed.toString(), { expires: 365 });
+  }, [scrollSpeed]);
+
+  useEffect(() => {
+    Cookies.set(COOKIE_KEYS.animationFrames, animationFrames.toString(), { expires: 365 });
+  }, [animationFrames]);
+
+  useEffect(() => {
+    Cookies.set(COOKIE_KEYS.cameraMovementSpeed, cameraMovementSpeed.toString(), { expires: 365 });
+  }, [cameraMovementSpeed]);
+
+  useEffect(() => {
+    Cookies.set(COOKIE_KEYS.cameraRotationSensitivity, cameraRotationSensitivity.toString(), { expires: 365 });
+  }, [cameraRotationSensitivity]);
+
+  useEffect(() => {
+    Cookies.set(COOKIE_KEYS.backgroundColor, backgroundColor, { expires: 365 });
+  }, [backgroundColor]);
+
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -149,8 +246,7 @@ const App: React.FC = () => {
     sceneRef.current = scene;
 
     // Set the initial background color
-    scene.clearColor =
-      BABYLON.Color3.FromHexString("#7D7D7D").toColor4(1);
+    scene.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
 
     // Check for WebXR support
     if (navigator.xr) {
@@ -187,6 +283,9 @@ const App: React.FC = () => {
     camera.keysLeft.push(65); // A
     camera.keysRight.push(68); // D
 
+    camera.keysUpward.push(81); // Q
+    camera.keysDownward.push(69); // E
+
     // Enable gamepad control
     const gamepadManager = scene.gamepadManager;
     gamepadManager.onGamepadConnectedObservable.add((gamepad) => {
@@ -202,14 +301,20 @@ const App: React.FC = () => {
 
     // Create a basic light
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
-    
     // Variables for Loaded Meshes
     let loadedMeshes: BABYLON.AbstractMesh[] = [];
     let isComponentMounted = true; // Flag to check if component is still mounted
 
     // Load model if URL is provided
     if (loadedModelUrl) {
-      loadModelFile(loadedModelUrl, loadedMeshes, scene, isComponentMounted, setIsModelLocal, infoTextRef);
+      loadModelFile(
+        loadedModelUrl,
+        loadedMeshes,
+        scene,
+        isComponentMounted,
+        setIsModelLocal,
+        infoTextRef
+      );
     }
 
     // Drag-and-Drop Functionality
@@ -234,7 +339,14 @@ const App: React.FC = () => {
           ext === "gltf" ||
           ext === "glb"
         ) {
-          loadModelFile(file, loadedMeshes, scene, isComponentMounted, setIsModelLocal, infoTextRef);
+          loadModelFile(
+            file,
+            loadedMeshes,
+            scene,
+            isComponentMounted,
+            setIsModelLocal,
+            infoTextRef
+          );
         } else {
           alert("Please drop a .splat, .ply, .gltf, or .glb file.");
         }
@@ -288,7 +400,7 @@ const App: React.FC = () => {
       }
     });
 
-    const keydownHandler = () => {
+    const keydownHandlerInternal = () => {
       userControlRef.current = true;
 
       // Switch to Euler angles (rotation) when user takes control
@@ -297,11 +409,10 @@ const App: React.FC = () => {
         (camera as any).rotationQuaternion = null; // Use type assertion to assign null
       }
     };
-    window.addEventListener("keydown", keydownHandler);
+    window.addEventListener("keydown", keydownHandlerInternal);
 
-   // Handle scroll events to move the camera along the path or animate it back
+    // Handle scroll events to move the camera along the path or animate it back
     const wheelHandlerLocal = (event: WheelEvent) => {
-      //full wheel handler function is in tools folder
       wheelHandler(
         event,
         animatingToPathRef,
@@ -313,9 +424,9 @@ const App: React.FC = () => {
         animationFrames,
         scrollSpeed,
         scrollTargetRef,
-        scrollPositionRef);
-     
-    }; 
+        scrollPositionRef
+      );
+    };
     window.addEventListener("wheel", wheelHandlerLocal);
     // Prevent default scrolling behavior on the canvas
     const preventCanvasScroll = (event: Event) => {
@@ -398,6 +509,29 @@ const App: React.FC = () => {
           }
         }
 
+        // Check for waypoint triggers
+        waypoints.forEach((wp, index) => {
+          const distance = BABYLON.Vector3.Distance(
+            camera.position,
+            new BABYLON.Vector3(wp.x, wp.y, wp.z)
+          );
+          const triggerDistance = 1.0; // Define a suitable trigger distance
+
+          if (distance <= triggerDistance) {
+            if (!activeWaypointsRef.current.has(index)) {
+              // Entering the buffer zone
+              activeWaypointsRef.current.add(index);
+              executeInteractions(wp.interactions, scene);
+            }
+          } else {
+            if (activeWaypointsRef.current.has(index)) {
+              // Exiting the buffer zone
+              activeWaypointsRef.current.delete(index);
+              reverseInteractions(wp.interactions, scene);
+            }
+          }
+        });
+
         scene.render();
       }
     });
@@ -414,7 +548,7 @@ const App: React.FC = () => {
       // Remove event listeners
       document.removeEventListener("dragover", preventDefault, false);
       document.removeEventListener("drop", handleDrop, false);
-      window.removeEventListener("keydown", keydownHandler);
+      window.removeEventListener("keydown", keydownHandlerInternal);
       window.removeEventListener("wheel", wheelHandlerLocal);
       window.removeEventListener("resize", resizeHandler);
 
@@ -434,7 +568,8 @@ const App: React.FC = () => {
     scrollSpeed,
     animationFrames,
     cameraMovementSpeed,
-    cameraRotationSensitivity
+    cameraRotationSensitivity,
+    backgroundColor,
   ]); // Re-run effect when dependencies change
 
   // Effect to update background color when it changes
@@ -465,7 +600,16 @@ const App: React.FC = () => {
     );
 
     // Generate the HTML content
-    const htmlContent = generateExportedHTML(modelUrl, includeUI, waypoints, backgroundColor, cameraMovementSpeed, cameraRotationSensitivity, scrollSpeed, animationFrames);
+    const htmlContent = generateExportedHTML(
+      modelUrl,
+      includeUI,
+      waypoints,
+      backgroundColor,
+      cameraMovementSpeed,
+      cameraRotationSensitivity,
+      scrollSpeed,
+      animationFrames
+    );
 
     // Create a blob and trigger download
     const blob = new Blob([htmlContent], { type: "text/html" });
@@ -477,6 +621,113 @@ const App: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Function to execute interactions
+  const executeInteractions = (interactions: Interaction[], scene: BABYLON.Scene) => {
+    interactions.forEach((interaction) => {
+      switch (interaction.type) {
+        case "audio":
+          playAudioInteraction(interaction.data as AudioInteractionData);
+          break;
+        case "info":
+          showInfoInteraction(interaction.data as InfoInteractionData);
+          break;
+        case "animation":
+          triggerAnimationInteraction(
+            interaction.data as AnimationInteractionData,
+            scene
+          );
+          break;
+        default:
+          console.warn(`Unsupported interaction type: ${interaction.type}`);
+      }
+    });
+  };
+
+  // Function to reverse interactions (when exiting buffer zone)
+  const reverseInteractions = (interactions: Interaction[], scene: BABYLON.Scene) => {
+    interactions.forEach((interaction) => {
+      switch (interaction.type) {
+        case "audio":
+          stopAudioInteraction(interaction.id);
+          break;
+        case "info":
+          hideInfoInteraction();
+          break;
+        case "animation":
+          stopAnimationInteraction(
+            interaction.id,
+            scene
+          );
+          break;
+        default:
+          console.warn(`Unsupported interaction type: ${interaction.type}`);
+      }
+    });
+  };
+
+  // Function to play audio interactions
+  const playAudioInteraction = (data: AudioInteractionData) => {
+    const audioData = data;
+    const audio = new Audio(audioData.url);
+    audio.loop = true; // Loop the audio if needed
+    audio.play().catch((error) => {
+      console.error("Error playing audio:", error);
+    });
+    activeAudioRefs.current[audioData.url] = audio;
+  };
+
+  // Function to stop audio interactions
+  const stopAudioInteraction = (id: string) => {
+    // Assuming id corresponds to the audio URL for simplicity
+    const audio = activeAudioRefs.current[id];
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      delete activeAudioRefs.current[id];
+    }
+  };
+
+  // Function to show info interactions
+  const showInfoInteraction = (data: InfoInteractionData) => {
+    const infoData = data;
+    setInfoPopupText(infoData.text);
+  };
+
+  // Function to hide info interactions
+  const hideInfoInteraction = () => {
+    setInfoPopupText(null);
+  };
+
+  // Function to trigger animation interactions
+  const triggerAnimationInteraction = (
+    data: AnimationInteractionData,
+    scene: BABYLON.Scene
+  ) => {
+    const animationData = data;
+    console.log("Triggering animation:", animationData.animationName);
+    // Example: Play an animation on a specific mesh
+    const mesh = scene.getMeshByName(animationData.animationName);
+    if (mesh && mesh.animations.length > 0) {
+      //play animations assiocaited with the mesh 
+      mesh.beginAnimation(mesh.animations[0].name, false, 1);
+      activeAnimationsRef.current[animationData.animationName] = mesh.animations[0];
+    }
+  };
+
+  // Function to stop animation interactions
+  const stopAnimationInteraction = (
+    id: string,
+    scene: BABYLON.Scene
+  ) => {
+    // Assuming id corresponds to the mesh name
+    const mesh = scene.getMeshByName(id);
+    if (mesh) {
+      scene.stopAnimation(mesh);
+      delete activeAnimationsRef.current[id];
+    }
+  };
+
 
 
   return (
@@ -500,23 +751,60 @@ const App: React.FC = () => {
           fontSize: "24px",
           textAlign: "center",
           zIndex: 5,
+          pointerEvents: "none",
         }}
       >
         Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
       </div>
 
+      {/* Control Panels */}
       <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} />
       <Controls />
-      <ParameterControls scrollSpeed={scrollSpeed} setScrollSpeed={setScrollSpeed} animationFrames={animationFrames} setAnimationFrames={setAnimationFrames}cameraMovementSpeed={cameraMovementSpeed} setCameraMovementSpeed={setCameraMovementSpeed} cameraRotationSensitivity={cameraRotationSensitivity} setCameraRotationSensitivity={setCameraRotationSensitivity} scrollPercentage={scrollPercentage} adjustScroll={adjustScroll} showScrollControls={showScrollControls} setShowScrollControls={setShowScrollControls}/>
-      <ScrollControls scrollPercentage={scrollPercentage} adjustScroll={adjustScroll} showScrollControls={showScrollControls} setShowScrollControls={setShowScrollControls} />
-      <SplatLoader setLoadedModelUrl={setLoadedModelUrl} setIsModelLocal={setIsModelLocal} customModelUrl={customModelUrl} setCustomModelUrl={setCustomModelUrl}/>
-      <BackgroundColorSelector backgroundColor={backgroundColor} setBackgroundColor={setBackgroundColor} />
-      <ExportButton handleExport={handleExport}/>
+      <ParameterControls
+        scrollSpeed={scrollSpeed}
+        setScrollSpeed={setScrollSpeed}
+        animationFrames={animationFrames}
+        setAnimationFrames={setAnimationFrames}
+        cameraMovementSpeed={cameraMovementSpeed}
+        setCameraMovementSpeed={setCameraMovementSpeed}
+        cameraRotationSensitivity={cameraRotationSensitivity}
+        setCameraRotationSensitivity={setCameraRotationSensitivity}
+        scrollPercentage={scrollPercentage}
+        adjustScroll={adjustScroll}
+        showScrollControls={showScrollControls}
+        setShowScrollControls={setShowScrollControls}
+      />
+      <ScrollControls
+        scrollPercentage={scrollPercentage}
+        adjustScroll={adjustScroll}
+        showScrollControls={showScrollControls}
+        setShowScrollControls={setShowScrollControls}
+      />
+      <LoadSaveExportMenu
+        setLoadedModelUrl={setLoadedModelUrl}
+        setIsModelLocal={setIsModelLocal}
+        customModelUrl={customModelUrl}
+        setCustomModelUrl={setCustomModelUrl}
+        handleExport={handleExport}
+        resetSettings={resetSettings}
+      />
+      <BackgroundColorSelector
+        backgroundColor={backgroundColor}
+        setBackgroundColor={setBackgroundColor}
+      />
       <GitHubLink repoUrl="https://github.com/SonnyC56/gaussian-splatting-viewer" />
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100%", touchAction: "none" }}
       />
+
+      {/* Info Popup */}
+      {infoPopupText && (
+        <InfoPopup
+          text={infoPopupText}
+          onClose={() => setInfoPopupText(null)}
+        />
+      )}
     </div>
   );
 };

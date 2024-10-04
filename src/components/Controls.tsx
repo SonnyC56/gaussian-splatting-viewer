@@ -40,6 +40,7 @@ import Draggable from "react-draggable";
       </p>
       <ul style={{ paddingLeft: "20px", margin: "5px 0" }}>
         <li>W/A/S/D: Move camera</li>
+        <li>Q/E: Up/Down</li>
         <li>Mouse: Look around</li>
         <li>Scroll: Move along path</li>
         <li>Drag and drop a .splat or .ply file to load</li>
