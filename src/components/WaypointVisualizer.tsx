@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as BABYLON from '@babylonjs/core';
-import '@babylonjs/core/Gizmos/positionGizmo';
-import '@babylonjs/core/Gizmos/rotationGizmo';
+import '@babylonjs/core/Gizmos/gizmoManager';
 
 interface Waypoint {
   x: number;
@@ -21,53 +20,56 @@ interface WaypointVisualizerProps {
 const WaypointVisualizer: React.FC<WaypointVisualizerProps> = ({ scene, waypoints, setWaypoints, isEditMode }) => {
   const spheresRef = useRef<BABYLON.Mesh[]>([]);
   const linesRef = useRef<BABYLON.LinesMesh | null>(null);
-  const gizmosRef = useRef<BABYLON.PositionGizmo[]>([]);
-  const rotationGizmosRef = useRef<BABYLON.RotationGizmo[]>([]);
   const gizmoManagerRef = useRef<BABYLON.GizmoManager | null>(null);
+
+  useEffect(() => {
+    if (!scene) return;
+
+    // Create a single GizmoManager for the scene
+    gizmoManagerRef.current = new BABYLON.GizmoManager(scene);
+    gizmoManagerRef.current.positionGizmoEnabled = true;
+    gizmoManagerRef.current.rotationGizmoEnabled = true;
+    gizmoManagerRef.current.usePointerToAttachGizmos = false;
+    gizmoManagerRef.current.attachableMeshes = [];
+
+    return () => {
+      if (gizmoManagerRef.current) {
+        gizmoManagerRef.current.dispose();
+      }
+    };
+  }, [scene]);
 
   useEffect(() => {
     if (!scene || !isEditMode) return;
 
-    // Create a gizmo manager
-    gizmoManagerRef.current = new BABYLON.GizmoManager(scene);
-    gizmoManagerRef.current.positionGizmoEnabled = true;
-    gizmoManagerRef.current.rotationGizmoEnabled = true;
-    gizmoManagerRef.current.attachableMeshes = [];
-
-    // Create spheres and gizmos for waypoints
+    // Create or update spheres for waypoints
     spheresRef.current = waypoints.map((wp, index) => {
-      const sphere = BABYLON.MeshBuilder.CreateSphere(`waypoint-${index}`, { diameter: 0.2 }, scene);
+      let sphere = scene.getMeshByName(`waypoint-${index}`) as BABYLON.Mesh;
+      if (!sphere) {
+        sphere = BABYLON.MeshBuilder.CreateSphere(`waypoint-${index}`, { diameter: 0.2 }, scene);
+        sphere.material = new BABYLON.StandardMaterial(`waypoint-material-${index}`, scene);
+      }
       sphere.position = new BABYLON.Vector3(wp.x, wp.y, wp.z);
       sphere.rotationQuaternion = wp.rotation.clone();
-      sphere.material = new BABYLON.StandardMaterial(`waypoint-material-${index}`, scene);
       (sphere.material as BABYLON.StandardMaterial).diffuseColor = new BABYLON.Color3(1, 0, 0);
 
-      const positionGizmo = new BABYLON.PositionGizmo();
-      positionGizmo.attachedMesh = sphere;
-      positionGizmo.updateGizmoPositionToMatchAttachedMesh = true;
-      positionGizmo.scaleRatio = 1;
-
-      const rotationGizmo = new BABYLON.RotationGizmo();
-      rotationGizmo.attachedMesh = sphere;
-      rotationGizmo.updateGizmoRotationToMatchAttachedMesh = true;
-      rotationGizmo.scaleRatio = .5;
-
-      positionGizmo.onDragEndObservable.add(() => {
-        updateWaypointPosition(index, sphere.position);
-      });
-
-      rotationGizmo.onDragEndObservable.add(() => {
-        updateWaypointRotation(index, sphere.rotationQuaternion as BABYLON.Quaternion);
-      });
-
-      gizmosRef.current.push(positionGizmo);
-      rotationGizmosRef.current.push(rotationGizmo);
-      if (gizmoManagerRef.current && gizmoManagerRef.current.attachableMeshes) {
-        gizmoManagerRef.current.attachableMeshes.push(sphere);
-      }
+      // Add click event to sphere
+      sphere.actionManager = new BABYLON.ActionManager(scene);
+      sphere.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
+          if (gizmoManagerRef.current) {
+            gizmoManagerRef.current.attachToMesh(sphere);
+          }
+        })
+      );
 
       return sphere;
     });
+
+    // Update gizmo manager
+    if (gizmoManagerRef.current) {
+      gizmoManagerRef.current.attachableMeshes = spheresRef.current;
+    }
 
     // Create lines connecting waypoints
     updateLines();
@@ -75,12 +77,27 @@ const WaypointVisualizer: React.FC<WaypointVisualizerProps> = ({ scene, waypoint
     return () => {
       // Cleanup
       spheresRef.current.forEach(sphere => sphere.dispose());
-      gizmosRef.current.forEach(gizmo => gizmo.dispose());
-      rotationGizmosRef.current.forEach(gizmo => gizmo.dispose());
       if (linesRef.current) linesRef.current.dispose();
-      if (gizmoManagerRef.current) gizmoManagerRef.current.dispose();
     };
   }, [scene, waypoints, isEditMode, setWaypoints]);
+
+  useEffect(() => {
+    if (gizmoManagerRef.current) {
+      gizmoManagerRef.current.onAttachedToMeshObservable.add((mesh) => {
+        if (mesh) {
+          const index = spheresRef.current.findIndex(sphere => sphere === mesh);
+          if (index !== -1) {
+            gizmoManagerRef.current!.gizmos.positionGizmo!.onDragEndObservable.add(() => {
+              updateWaypointPosition(index, mesh.position);
+            });
+            gizmoManagerRef.current!.gizmos.rotationGizmo!.onDragEndObservable.add(() => {
+              updateWaypointRotation(index, mesh.rotationQuaternion as BABYLON.Quaternion);
+            });
+          }
+        }
+      });
+    }
+  }, [setWaypoints]);
 
   const updateWaypointPosition = (index: number, newPosition: BABYLON.Vector3) => {
     setWaypoints(prevWaypoints => {
@@ -125,15 +142,13 @@ const WaypointVisualizer: React.FC<WaypointVisualizerProps> = ({ scene, waypoint
         sphere.position = new BABYLON.Vector3(waypoints[index].x, waypoints[index].y, waypoints[index].z);
         sphere.rotationQuaternion = waypoints[index].rotation.clone();
       });
-      gizmosRef.current.forEach(gizmo => gizmo.attachedMesh?.setEnabled(true));
-      rotationGizmosRef.current.forEach(gizmo => gizmo.attachedMesh?.setEnabled(true));
       if (linesRef.current) linesRef.current.setEnabled(true);
+      if (gizmoManagerRef.current) gizmoManagerRef.current.attachToMesh(null);
     } else {
       // Hide visualization when not in edit mode
       spheresRef.current.forEach(sphere => sphere.setEnabled(false));
-      gizmosRef.current.forEach(gizmo => gizmo.attachedMesh?.setEnabled(false));
-      rotationGizmosRef.current.forEach(gizmo => gizmo.attachedMesh?.setEnabled(false));
       if (linesRef.current) linesRef.current.setEnabled(false);
+      if (gizmoManagerRef.current) gizmoManagerRef.current.attachToMesh(null);
     }
   }, [waypoints, isEditMode, scene]);
 
@@ -143,7 +158,7 @@ const WaypointVisualizer: React.FC<WaypointVisualizerProps> = ({ scene, waypoint
 
     waypoints.forEach((wp, index) => {
       const arrowName = `waypoint-arrow-${index}`;
-      let arrow = scene.getMeshByName(arrowName);
+      let arrow = scene.getMeshByName(arrowName) as BABYLON.Mesh;
 
       if (!arrow) {
         arrow = BABYLON.MeshBuilder.CreateCylinder(arrowName, {
@@ -171,8 +186,20 @@ const WaypointVisualizer: React.FC<WaypointVisualizerProps> = ({ scene, waypoint
       });
     };
   }, [waypoints, isEditMode, scene]);
-
+if(!isEditMode || gizmoManagerRef.current?.attachedMesh){
   return null; // This component doesn't render anything directly
+} else {
+
+  //add a instructions component 
+    return (
+        <div style={{ position: 'absolute', bottom: 300, left: 0, width: '100%',  display: 'flex',  justifyContent: 'center'}}>
+        <div style={{ position: 'absolute', color: 'white' }}>
+            <h1>Click Sphere to Reveal Gizmo</h1>
+        </div>
+        </div>
+    );
+}
+
 };
 
 export default WaypointVisualizer;

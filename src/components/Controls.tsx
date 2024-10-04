@@ -44,9 +44,6 @@ import Draggable from "react-draggable";
         <li>Mouse: Look around</li>
         <li>Scroll: Move along path</li>
         <li>Drag and drop a .splat or .ply file to load</li>
-        <li>
-          Click "Add Waypoint at Current Position" to add waypoint
-        </li>
       </ul>
     </div>
   )}
