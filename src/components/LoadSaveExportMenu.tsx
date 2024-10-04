@@ -12,15 +12,6 @@ const COOKIE_KEYS = {
   // Add more keys if needed
 };
 
-// Define default settings
-const DEFAULT_SETTINGS = {
-  scrollSpeed: 0.1,
-  animationFrames: 120,
-  cameraMovementSpeed: 0.2,
-  cameraRotationSensitivity: 4000,
-  backgroundColor: "#7D7D7D",
-};
-
 interface LoadSaveExportMenuProps {
   setLoadedModelUrl: React.Dispatch<React.SetStateAction<string | null>>;
   setIsModelLocal: React.Dispatch<React.SetStateAction<boolean>>;

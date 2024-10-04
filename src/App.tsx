@@ -306,7 +306,6 @@ const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
     // Create a basic light
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
     // Variables for Loaded Meshes
-    let loadedMeshes: BABYLON.AbstractMesh[] = [];
     let isComponentMounted = true; // Flag to check if component is still mounted
 
     // Load model if URL is provided
@@ -828,7 +827,7 @@ useEffect(() => {
           fontSize: "24px",
           textAlign: "center",
           zIndex: 5,
-          pointerEvents: "none",
+            pointerEvents: "none",
         }}
       >
         Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
