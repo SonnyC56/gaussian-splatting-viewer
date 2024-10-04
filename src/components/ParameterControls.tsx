@@ -38,6 +38,7 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
           position: "absolute",
           bottom: "10px",
           left: "10px",
+          height: '180px',
           backgroundColor: "rgba(0,0,0,0.7)",
           padding: "10px",
           borderRadius: "5px",

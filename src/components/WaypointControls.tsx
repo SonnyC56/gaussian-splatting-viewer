@@ -68,8 +68,8 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
           className="handle"
           style={{
             position: "absolute",
-            bottom: "10px",
-            left: "40%",
+            bottom: "50px",
+            right: "10px",
             transform: "translateX(-50%)",
             backgroundColor: "rgba(0,0,0,0.7)",
             borderRadius: "5px",

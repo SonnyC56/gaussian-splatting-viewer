@@ -15,7 +15,8 @@ const BackgroundColorSelector: React.FC<BackgroundColorSelectorProps> = ({ backg
         className="handle"
         style={{
           position: 'absolute',
-          top: '10px',
+          bottom: '220px',
+          width: '200px',
           left: '10px',
           backgroundColor: 'rgba(0,0,0,0.7)',
           padding: '10px',

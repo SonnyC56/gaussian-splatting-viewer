@@ -21,8 +21,8 @@ const ScrollControls: React.FC<ScrollControlsProps> = ({
         className="handle"
         style={{
           position: "absolute",
-          top: "50%",
-          right: "10px",
+          bottom: "335px",
+          left: "10px",
           transform: "translateY(-50%)",
           backgroundColor: "rgba(0,0,0,0.7)",
           padding: "10px",

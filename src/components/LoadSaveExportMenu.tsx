@@ -75,7 +75,7 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
         style={{
           position: "absolute",
           top: "10px",
-          left: "250px",
+          left: "10px",
           backgroundColor: "rgba(0,0,0,0.7)",
           padding: "10px",
           borderRadius: "5px",
