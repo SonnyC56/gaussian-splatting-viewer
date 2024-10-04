@@ -1,35 +1,34 @@
-// WaypointControls.tsx
 import React, { useState } from "react";
 import Draggable from "react-draggable";
 import * as BABYLON from "@babylonjs/core";
 import { Waypoint, Interaction } from "../App";
-import InteractionEditor from "./InteractionEditor"; // Ensure the path is correct
+import InteractionEditor from "./InteractionEditor";
 
-// WaypointControls Props
 type WaypointControlsProps = {
   waypoints: Waypoint[];
   setWaypoints: React.Dispatch<React.SetStateAction<Waypoint[]>>;
 };
 
 const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypoints }) => {
-  // State to manage which waypoint's interactions are being edited
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
-  
-  // State to manage collapse
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
-  // Handler to update waypoint coordinates
   const handleWaypointChange = (
     index: number,
-    axis: "x" | "y" | "z",
+    axis: "x" | "y" | "z" | "rotationX" | "rotationY" | "rotationZ",
     value: string
   ) => {
     const newWaypoints = [...waypoints];
-    newWaypoints[index][axis] = parseFloat(value);
+    if (axis === "x" || axis === "y" || axis === "z") {
+      newWaypoints[index][axis] = parseFloat(value);
+    } else {
+      const rotation = newWaypoints[index].rotation.toEulerAngles();
+      rotation[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z'] = parseFloat(value);
+      newWaypoints[index].rotation = BABYLON.Quaternion.FromEulerAngles(rotation.x, rotation.y, rotation.z);
+    }
     setWaypoints(newWaypoints);
   };
 
-  // Handler to add a new waypoint
   const addWaypoint = () => {
     const newWaypoint: Waypoint = {
       x: 0,
@@ -41,13 +40,11 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
     setWaypoints([...waypoints, newWaypoint]);
   };
 
-  // Handler to remove a waypoint
   const removeWaypoint = (index: number) => {
     const newWaypoints = waypoints.filter((_, i) => i !== index);
     setWaypoints(newWaypoints);
   };
 
-  // Handler to update interactions for a waypoint
   const updateWaypointInteractions = (interactions: Interaction[]) => {
     if (editingWaypointIndex !== null) {
       const newWaypoints = [...waypoints];
@@ -56,7 +53,6 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
     }
   };
 
-  // Toggle collapse
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
@@ -75,14 +71,13 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
             borderRadius: "5px",
             color: "white",
             zIndex: 10,
-            width: "320px", // Slightly increased width for better content fit
+            width: "320px",
             boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
             cursor: "move",
             overflow: "hidden",
             transition: "height 0.3s ease",
           }}
         >
-          {/* Header */}
           <div
             className="header"
             style={{
@@ -111,11 +106,10 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
             </button>
           </div>
 
-          {/* Content */}
           <div
             className="content"
             style={{
-              maxHeight: isCollapsed ? "0px" : "calc(50vh - 50px)", // Adjust based on header height
+              maxHeight: isCollapsed ? "0px" : "calc(50vh - 50px)",
               opacity: isCollapsed ? 0 : 1,
               padding: isCollapsed ? "0 10px" : "10px",
               transition: "max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease",
@@ -173,64 +167,28 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
                     )}
                   </div>
                 </div>
-                <div
-                  style={{
-                    marginTop: "5px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <label style={{ fontSize: "12px" }}>
-                    X:
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={wp.x}
-                      onChange={(e) => handleWaypointChange(index, "x", e.target.value)}
-                      style={{
-                        width: "50px",
-                        marginLeft: "5px",
-                        fontSize: "12px",
-                        padding: "2px 4px",
-                        borderRadius: "3px",
-                        border: "none",
-                      }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "12px" }}>
-                    Y:
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={wp.y}
-                      onChange={(e) => handleWaypointChange(index, "y", e.target.value)}
-                      style={{
-                        width: "50px",
-                        marginLeft: "5px",
-                        fontSize: "12px",
-                        padding: "2px 4px",
-                        borderRadius: "3px",
-                        border: "none",
-                      }}
-                    />
-                  </label>
-                  <label style={{ fontSize: "12px" }}>
-                    Z:
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={wp.z}
-                      onChange={(e) => handleWaypointChange(index, "z", e.target.value)}
-                      style={{
-                        width: "50px",
-                        marginLeft: "5px",
-                        fontSize: "12px",
-                        padding: "2px 4px",
-                        borderRadius: "3px",
-                        border: "none",
-                      }}
-                    />
-                  </label>
+                <div style={{ marginTop: "5px", display: "flex", flexDirection: "column" }}>
+                  {["x", "y", "z", "rotationX", "rotationY", "rotationZ"].map((axis) => (
+                    <label key={axis} style={{ fontSize: "12px", marginBottom: "5px" }}>
+                      {axis.charAt(0).toUpperCase() + axis.slice(1)}:
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={axis.startsWith("rotation") 
+                          ? wp.rotation.toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']
+                          : wp[axis as "x" | "y" | "z"]}
+                        onChange={(e) => handleWaypointChange(index, axis as "x" | "y" | "z" | "rotationX" | "rotationY" | "rotationZ", e.target.value)}
+                        style={{
+                          width: "70px",
+                          marginLeft: "5px",
+                          fontSize: "12px",
+                          padding: "2px 4px",
+                          borderRadius: "3px",
+                          border: "none",
+                        }}
+                      />
+                    </label>
+                  ))}
                 </div>
               </div>
             ))}
@@ -254,7 +212,6 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
         </div>
       </Draggable>
 
-      {/* Conditionally render InteractionEditor */}
       {editingWaypointIndex !== null && (
         <InteractionEditor
           waypointIndex={editingWaypointIndex}
