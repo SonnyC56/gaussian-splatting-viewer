@@ -7,9 +7,16 @@ import InteractionEditor from "./InteractionEditor";
 type WaypointControlsProps = {
   waypoints: Waypoint[];
   setWaypoints: React.Dispatch<React.SetStateAction<Waypoint[]>>;
+  isEditMode: boolean;
+  setIsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypoints }) => {
+const WaypointControls: React.FC<WaypointControlsProps> = ({ 
+  waypoints, 
+  setWaypoints, 
+  isEditMode, 
+  setIsEditMode 
+}) => {
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
@@ -69,6 +76,10 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
     setIsCollapsed(!isCollapsed);
   };
 
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+  };
+
   return (
     <>
       <Draggable handle=".handle">
@@ -102,20 +113,37 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
             }}
           >
             <h3 style={{ margin: 0, fontSize: "16px" }}>Waypoints</h3>
-            <button
-              onClick={toggleCollapse}
-              style={{
-                backgroundColor: "transparent",
-                border: "none",
-                color: "white",
-                cursor: "pointer",
-                fontSize: "18px",
-                lineHeight: "1",
-              }}
-              aria-label={isCollapsed ? "Expand Waypoints" : "Collapse Waypoints"}
-            >
-              {isCollapsed ? "▼" : "▲"}
-            </button>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <button
+                onClick={toggleEditMode}
+                style={{
+                  marginRight: "10px",
+                  padding: "4px 8px",
+                  backgroundColor: isEditMode ? "#dc3545" : "#28a745",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                  borderRadius: "3px",
+                  fontSize: "12px",
+                }}
+              >
+                {isEditMode ? "Exit Edit Mode" : "Enter Edit Mode"}
+              </button>
+              <button
+                onClick={toggleCollapse}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "none",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "18px",
+                  lineHeight: "1",
+                }}
+                aria-label={isCollapsed ? "Expand Waypoints" : "Collapse Waypoints"}
+              >
+                {isCollapsed ? "▼" : "▲"}
+              </button>
+            </div>
           </div>
 
           <div
@@ -223,7 +251,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
           </div>
         </div>
       </Draggable>
-
+      
       {editingWaypointIndex !== null && (
         <InteractionEditor
           waypointIndex={editingWaypointIndex}

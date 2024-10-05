@@ -758,7 +758,7 @@ const App: React.FC = () => {
         Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
       </div>
 
-      <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} />
+      <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} isEditMode={isEditMode} setIsEditMode={setIsEditMode}/>
       <Controls />
       <ParameterControls
         scrollSpeed={scrollSpeed}
@@ -816,11 +816,6 @@ const App: React.FC = () => {
           onClose={() => setInfoPopupText(null)}
         />
       )}
-      <div style={{ position: 'absolute', top: '10px', left: '50%', zIndex: 10 }}>
-        <button onClick={() => setIsEditMode(!isEditMode)}>
-          {isEditMode ? 'Exit Edit Mode' : 'Enter Edit Mode'}
-        </button>
-      </div>
     </div>
   );
 };
