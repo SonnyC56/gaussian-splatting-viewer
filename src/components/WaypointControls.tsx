@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Draggable from "react-draggable";
 import * as BABYLON from "@babylonjs/core";
 import { Waypoint, Interaction } from "../App";
@@ -19,6 +19,12 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
 }) => {
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [collapsedWaypoints, setCollapsedWaypoints] = useState<Set<number>>(new Set());
+
+  // Initialize collapsedWaypoints to include all waypoints (collapsed by default)
+  useEffect(() => {
+    setCollapsedWaypoints(new Set(waypoints.map((_, index) => index)));
+  }, [waypoints.length]);
 
   const getQuaternionFromRotation = (rotation: any): BABYLON.Quaternion => {
     if (rotation instanceof BABYLON.Quaternion) {
@@ -57,11 +63,23 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
       interactions: [],
     };
     setWaypoints([...waypoints, newWaypoint]);
+    // Automatically collapse the new waypoint's coordinates
+    setCollapsedWaypoints(prev => new Set(prev).add(waypoints.length));
   };
 
   const removeWaypoint = (index: number) => {
     const newWaypoints = waypoints.filter((_, i) => i !== index);
     setWaypoints(newWaypoints);
+    // Update collapsedWaypoints by removing the deleted index and adjusting subsequent indices
+    setCollapsedWaypoints(prev => {
+      const newSet = new Set<number>();
+      newWaypoints.forEach((_, i) => {
+        if (prev.has(i < index ? i : i + 1)) {
+          newSet.add(i);
+        }
+      });
+      return newSet;
+    });
   };
 
   const updateWaypointInteractions = (interactions: Interaction[]) => {
@@ -80,6 +98,18 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
     setIsEditMode(!isEditMode);
   };
 
+  const toggleWaypointCollapse = (index: number) => {
+    setCollapsedWaypoints(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <>
       <Draggable handle=".handle">
@@ -89,16 +119,16 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
             position: "absolute",
             bottom: "50px",
             right: "10px",
-            transform: "translateX(-50%)",
             backgroundColor: "rgba(0,0,0,0.7)",
             borderRadius: "5px",
             color: "white",
             zIndex: 10,
-            width: "320px",
+            // Removed fixed width to allow responsiveness
             boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
             cursor: "move",
             overflow: "hidden",
             transition: "height 0.3s ease",
+            fontFamily: "Arial, sans-serif",
           }}
         >
           <div
@@ -112,7 +142,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
               cursor: "move",
             }}
           >
-            <h3 style={{ margin: 0, fontSize: "16px" }}>Waypoints</h3>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "normal" }}>Waypoints</h3>
             <div style={{ display: "flex", alignItems: "center" }}>
               <button
                 onClick={toggleEditMode}
@@ -136,12 +166,12 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
                   border: "none",
                   color: "white",
                   cursor: "pointer",
-                  fontSize: "18px",
+                  fontSize: "16px",
                   lineHeight: "1",
                 }}
                 aria-label={isCollapsed ? "Expand Waypoints" : "Collapse Waypoints"}
               >
-                {isCollapsed ? "▼" : "▲"}
+                {isCollapsed ? "▲" : "▼"}
               </button>
             </div>
           </div>
@@ -149,42 +179,49 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
           <div
             className="content"
             style={{
-              maxHeight: isCollapsed ? "0px" : "calc(50vh - 50px)",
+              maxHeight: isCollapsed ? "0px" : "400px",
               opacity: isCollapsed ? 0 : 1,
               padding: isCollapsed ? "0 10px" : "10px",
               transition: "max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease",
               overflowY: "auto",
+              backgroundColor: "rgba(0,0,0,0.6)",
             }}
           >
             {waypoints.map((wp, index) => (
               <div
                 key={index}
                 style={{
-                  marginTop: "10px",
-                  borderBottom: "1px solid #555",
-                  paddingBottom: "10px",
+                  marginTop: "8px",
+                  paddingBottom: "8px",
+                  borderBottom: "1px solid #444",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
                     justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
-                  <span style={{ fontSize: "14px" }}>Waypoint {index + 1}</span>
+                  <span style={{ 
+                    fontSize: "14px", 
+                    color: "#ddd",
+                    marginRight: "10px" // Added margin to the right
+                  }}>
+                    Waypoint {index + 1}
+                  </span>
                   <div>
                     <button
                       onClick={() => setEditingWaypointIndex(index)}
                       style={{
                         marginRight: "5px",
-                        padding: "4px 8px",
+                        padding: "3px 6px",
                         backgroundColor: "#007BFF",
                         color: "white",
                         border: "none",
                         cursor: "pointer",
                         borderRadius: "3px",
-                        fontSize: "12px",
+                        fontSize: "11px",
                       }}
                     >
                       Edit Interactions
@@ -193,43 +230,89 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
                       <button
                         onClick={() => removeWaypoint(index)}
                         style={{
-                          padding: "4px 8px",
-                          backgroundColor: "red",
+                          padding: "3px 6px",
+                          backgroundColor: "#dc3545",
                           color: "white",
                           border: "none",
                           cursor: "pointer",
                           borderRadius: "3px",
-                          fontSize: "12px",
+                          fontSize: "11px",
                         }}
                       >
                         Delete
                       </button>
                     )}
+                    <button
+                      onClick={() => toggleWaypointCollapse(index)}
+                      style={{
+                        marginLeft: "5px",
+                        padding: "3px 6px",
+                        backgroundColor: "transparent",
+                        color: "#ccc",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                      aria-label={collapsedWaypoints.has(index) ? "Expand Coordinates" : "Collapse Coordinates"}
+                    >
+                      {collapsedWaypoints.has(index) ? "Show" : "Hide"} Coordinates
+                    </button>
                   </div>
                 </div>
-                <div style={{ marginTop: "5px", display: "flex", flexDirection: "column" }}>
-                  {["x", "y", "z", "rotationX", "rotationY", "rotationZ"].map((axis) => (
-                    <label key={axis} style={{ fontSize: "12px", marginBottom: "5px" }}>
-                      {axis.charAt(0).toUpperCase() + axis.slice(1)}:
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={axis.startsWith("rotation") 
-                          ? getQuaternionFromRotation(wp.rotation).toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']
-                          : wp[axis as "x" | "y" | "z"]}
-                        onChange={(e) => handleWaypointChange(index, axis as "x" | "y" | "z" | "rotationX" | "rotationY" | "rotationZ", e.target.value)}
-                        style={{
-                          width: "70px",
-                          marginLeft: "5px",
-                          fontSize: "12px",
-                          padding: "2px 4px",
-                          borderRadius: "3px",
-                          border: "none",
-                        }}
-                      />
-                    </label>
-                  ))}
-                </div>
+                {!collapsedWaypoints.has(index) && (
+                  <div style={{ marginTop: "6px" }}>
+                    {/* Position Coordinates */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "4px" }}>
+                      {["x", "y", "z"].map((axis) => (
+                        <label key={axis} style={{ display: "flex", alignItems: "center", fontSize: "12px", color: "#ccc" }}>
+                          <span style={{ marginRight: "4px", width: "30px" }}>
+                            {axis.toUpperCase()}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={wp[axis as "x" | "y" | "z"]}
+                            onChange={(e) => handleWaypointChange(index, axis as "x" | "y" | "z", e.target.value)}
+                            style={{
+                              width: "60px",
+                              padding: "2px 4px",
+                              borderRadius: "3px",
+                              border: "1px solid #555",
+                              backgroundColor: "#333",
+                              color: "#fff",
+                              fontSize: "12px",
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {/* Rotation Coordinates */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {["rotationX", "rotationY", "rotationZ"].map((axis) => (
+                        <label key={axis} style={{ display: "flex", alignItems: "center", fontSize: "12px", color: "#ccc" }}>
+                          <span style={{ marginRight: "4px", width: "30px" }}>
+                            {axis.replace("rotation", "R")}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={getQuaternionFromRotation(wp.rotation).toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']}
+                            onChange={(e) => handleWaypointChange(index, axis as "rotationX" | "rotationY" | "rotationZ", e.target.value)}
+                            style={{
+                              width: "60px",
+                              padding: "2px 4px",
+                              borderRadius: "3px",
+                              border: "1px solid #555",
+                              backgroundColor: "#333",
+                              color: "#fff",
+                              fontSize: "12px",
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             <button
@@ -237,7 +320,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
               style={{
                 marginTop: "10px",
                 padding: "6px 12px",
-                backgroundColor: "green",
+                backgroundColor: "#28a745",
                 color: "white",
                 border: "none",
                 cursor: "pointer",
