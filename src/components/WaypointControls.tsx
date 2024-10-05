@@ -9,13 +9,15 @@ type WaypointControlsProps = {
   setWaypoints: React.Dispatch<React.SetStateAction<Waypoint[]>>;
   isEditMode: boolean;
   setIsEditMode: React.Dispatch<React.SetStateAction<boolean>>;
+  scene?: BABYLON.Scene;
 };
 
 const WaypointControls: React.FC<WaypointControlsProps> = ({ 
   waypoints, 
   setWaypoints, 
   isEditMode, 
-  setIsEditMode 
+  setIsEditMode, 
+  scene 
 }) => {
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -56,10 +58,10 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
 
   const addWaypoint = () => {
     const newWaypoint: Waypoint = {
-      x: 0,
-      y: 0,
-      z: 0,
-      rotation: BABYLON.Quaternion.Identity(),
+      x: scene?.activeCamera?.position._x ?? 0,
+      y:  scene?.activeCamera?.position._y ?? 0,
+      z:  scene?.activeCamera?.position._z ?? 0,
+      rotation: scene?.activeCamera?.absoluteRotation ?? BABYLON.Quaternion.Identity(),
       interactions: [],
     };
     setWaypoints([...waypoints, newWaypoint]);
@@ -329,7 +331,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
                 width: "100%",
               }}
             >
-              Add Waypoint
+              Add Waypoint at Camera Position
             </button>
           </div>
         </div>

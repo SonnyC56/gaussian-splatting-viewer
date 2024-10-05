@@ -786,7 +786,7 @@ const App: React.FC = () => {
         Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
       </div>
 
-      <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} isEditMode={isEditMode} setIsEditMode={setIsEditMode}/>
+      <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} isEditMode={isEditMode} setIsEditMode={setIsEditMode} scene={sceneRef.current ?? undefined}/>
       <Controls />
       <ParameterControls
         scrollSpeed={scrollSpeed}
@@ -797,10 +797,6 @@ const App: React.FC = () => {
         setCameraMovementSpeed={setCameraMovementSpeed}
         cameraRotationSensitivity={cameraRotationSensitivity}
         setCameraRotationSensitivity={setCameraRotationSensitivity}
-        scrollPercentage={scrollPercentage}
-        adjustScroll={adjustScroll}
-        showScrollControls={showScrollControls}
-        setShowScrollControls={setShowScrollControls}
       />
       <ScrollControls
         scrollPercentage={scrollPercentage}
