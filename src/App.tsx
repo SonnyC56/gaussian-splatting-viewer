@@ -328,10 +328,9 @@ const App: React.FC = () => {
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
     let isComponentMounted = true;
 
-    if (loadedModelUrl) {
-      const loadedMeshes = loadModelFile(
+  /*   if (loadedModelUrl) {
+      const loadedMeshes = await loadModelFile(
         loadedModelUrl,
-        loadedMeshesRef.current,
         scene,
         isComponentMounted,
         setIsModelLocal,
@@ -340,43 +339,49 @@ const App: React.FC = () => {
       if(loadedMeshes){
           loadedMeshesRef.current = loadedMeshes;
       }
-    }
+    } */
 
     const preventDefault = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
     };
 
-    const handleDrop = (e: DragEvent) => {
-      preventDefault(e);
-      const dt = e.dataTransfer;
-      const files = dt?.files;
-
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    
+      const files = e.dataTransfer?.files;
+    
       if (files && files.length > 0) {
         const file = files[0];
         const ext = file.name.split(".").pop()?.toLowerCase();
-        if (
-          ext === "splat" ||
-          ext === "ply" ||
-          ext === "gltf" ||
-          ext === "glb"
-        ) {
-          const loadedMeshes = loadModelFile(
-            file,
-            loadedMeshesRef.current,
-            scene,
-            isComponentMounted,
-            setIsModelLocal,
-            infoTextRef
-          );
-          if(loadedMeshes){
+    
+        if (["splat", "ply", "gltf", "glb"].includes(ext || "")) {
+          try {
+            const loadedMeshes = await loadModelFile(
+              file,
+              sceneRef.current!,
+              isComponentMounted,
+              setIsModelLocal,
+              infoTextRef
+            );
+            if (loadedMeshes) {
               loadedMeshesRef.current = loadedMeshes;
+            }
+          } catch (error) {
+            console.error("Error loading model file:", error);
+            alert("Failed to load the model.");
+            if (infoTextRef.current) {
+              infoTextRef.current.style.display = "block";
+              infoTextRef.current.innerText = "Failed to load the model.";
+            }
           }
         } else {
           alert("Please drop a .splat, .ply, .gltf, or .glb file.");
         }
       }
     };
+    
 
     document.addEventListener("dragover", preventDefault, false);
     document.addEventListener("drop", handleDrop, false);
@@ -568,24 +573,34 @@ const App: React.FC = () => {
   }, [wheelHandlerLocal]);
 
   useEffect(() => {
-    console.log("Disposing old meshes: ", loadedMeshesRef.current);
-    loadedMeshesRef.current?.forEach(mesh => mesh.dispose());
-    
-    if (loadedModelUrl && sceneRef.current) {
-      const loadedModels = loadModelFile(
-        loadedModelUrl,
-        loadedMeshesRef.current,
-        sceneRef.current,
-        true,
-        setIsModelLocal,
-        infoTextRef
-      );
-      
-      if(loadedModels){
-        loadedMeshesRef.current = loadedModels;
+    const loadMeshes = async () => {
+      console.log("Disposing old meshes: ", loadedMeshesRef.current);
+      loadedMeshesRef.current?.forEach(mesh => mesh.dispose());
+  
+      console.log("Loading new model: loadedModelUrl: ", loadedModelUrl);
+      if (loadedModelUrl && sceneRef.current) {
+        try {
+          const loadedModels = await loadModelFile(
+            loadedModelUrl,
+            sceneRef.current,
+            true,
+            setIsModelLocal,
+            infoTextRef
+          );
+          console.log("Loaded models: ", loadedModels);
+          if (loadedModels && Array.isArray(loadedModels)) {
+            loadedMeshesRef.current = loadedModels;
+          }
+        } catch (error) {
+          console.error("Error loading model:", error);
+          // Optionally, update UI or state to reflect the error
+        }
       }
-    }
+    };
+  
+    loadMeshes();
   }, [loadedModelUrl]);
+  
 
   useEffect(() => {
     if (cameraRef.current) {
