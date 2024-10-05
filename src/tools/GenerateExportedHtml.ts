@@ -1,3 +1,4 @@
+
 export const generateExportedHTML = (
   modelUrl: string,
   includeUI: boolean,
@@ -12,7 +13,17 @@ export const generateExportedHTML = (
   cameraMovementSpeed: number,
   cameraRotationSensitivity: number,
   scrollSpeed: number,
-  animationFrames: number
+  animationFrames: number,
+  hotspots: Array<{
+    id: string;
+    position: { x: number; y: number; z: number };
+    scale: { x: number; y: number; z: number };
+    title: string;
+    information?: string;
+    photoUrl?: string;
+    activationMode: 'click' | 'hover';
+    color: string;
+  }>
 ) => {
   return `
 <!DOCTYPE html>
@@ -39,35 +50,16 @@ export const generateExportedHTML = (
     `
         : ""
     }
-    #infoPopupOverlay {
+    #hotspotContent {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      display: none;
-    }
-    #infoPopup {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    #closePopup {
-      margin-top: 15px;
-      padding: 8px 16px;
-      background-color: #007BFF;
+      background-color: rgba(0, 0, 0, 0.8);
       color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1001;
+      max-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      display: none;
     }
   </style>
 </head>
@@ -83,12 +75,7 @@ export const generateExportedHTML = (
   `
       : ""
   }
-  <div id="infoPopupOverlay">
-    <div id="infoPopup">
-      <p id="infoPopupText"></p>
-      <button id="closePopup">Close</button>
-    </div>
-  </div>
+  <div id="hotspotContent"></div>
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -134,87 +121,6 @@ export const generateExportedHTML = (
     let scrollPosition = 0;
     let scrollTarget = 0.01; // Start with a small value to enable scrolling
 
-    // InfoPopup functionality
-    const infoPopupOverlay = document.getElementById('infoPopupOverlay');
-    const infoPopupText = document.getElementById('infoPopupText');
-    const closePopupButton = document.getElementById('closePopup');
-
-    function showInfoPopup(text) {
-      infoPopupText.textContent = text;
-      infoPopupOverlay.style.display = 'flex';
-    }
-
-    function hideInfoPopup() {
-      infoPopupOverlay.style.display = 'none';
-    }
-
-    closePopupButton.addEventListener('click', hideInfoPopup);
-
-    // Function to add hover interaction
-    const addHoverInteraction = (mesh) => {
-      mesh.actionManager = new BABYLON.ActionManager(scene);
-
-      let tooltip = null;
-      let pointerMoveHandler = null;
-
-      mesh.actionManager.registerAction(
-        new BABYLON.ExecuteCodeAction(
-          BABYLON.ActionManager.OnPointerOverTrigger,
-          () => {
-            // Show tooltip
-            tooltip = document.createElement('div');
-            tooltip.id = 'tooltip';
-            tooltip.innerText = 'Hot spot example';
-            tooltip.style.position = 'absolute';
-            tooltip.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            tooltip.style.color = 'white';
-            tooltip.style.padding = '5px';
-            tooltip.style.borderRadius = '5px';
-            tooltip.style.pointerEvents = 'none';
-            tooltip.style.zIndex = '15';
-            document.body.appendChild(tooltip);
-
-            pointerMoveHandler = function (evt) {
-              if (tooltip) {
-                tooltip.style.left = evt.clientX + 10 + 'px';
-                tooltip.style.top = evt.clientY + 10 + 'px';
-              }
-            };
-            window.addEventListener('pointermove', pointerMoveHandler);
-          }
-        )
-      );
-
-      mesh.actionManager.registerAction(
-        new BABYLON.ExecuteCodeAction(
-          BABYLON.ActionManager.OnPointerOutTrigger,
-          () => {
-            // Hide tooltip
-            if (tooltip) {
-              tooltip.remove();
-              tooltip = null;
-            }
-            if (pointerMoveHandler) {
-              window.removeEventListener('pointermove', pointerMoveHandler);
-              pointerMoveHandler = null;
-            }
-          }
-        )
-      );
-
-      // Cleanup when the mesh is disposed
-      mesh.onDisposeObservable.add(() => {
-        if (tooltip) {
-          tooltip.remove();
-          tooltip = null;
-        }
-        if (pointerMoveHandler) {
-          window.removeEventListener('pointermove', pointerMoveHandler);
-          pointerMoveHandler = null;
-        }
-      });
-    };
-
     // Load the model file
     BABYLON.SceneLoader.ImportMeshAsync('', '', '${modelUrl}', scene)
       .then((result) => {
@@ -222,7 +128,6 @@ export const generateExportedHTML = (
         loadedMeshes.forEach((mesh) => {
           if (mesh instanceof BABYLON.Mesh) {
             mesh.position = BABYLON.Vector3.Zero();
-            addHoverInteraction(mesh);
           }
         });
       })
@@ -253,6 +158,100 @@ export const generateExportedHTML = (
       path = [controlPoints[0]];
     }
 
+  // Create hotspots
+    const hotspots = ${JSON.stringify(hotspots)};
+    console.log(hotspots);
+    //add inspector 
+
+    hotspots.forEach(hotspot => {
+ // Assign default scale if necessary
+    const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
+    ? new BABYLON.Vector3(1, 1, 1) // Default scale
+    : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
+
+      const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
+      sphere.position = new BABYLON.Vector3(hotspot.position._x, hotspot.position._y, hotspot.position._z);
+      sphere.scaling = scale;
+      console.log('created sphere, position:', sphere.position, 'scale:', sphere.scaling);
+      
+      const material = new BABYLON.StandardMaterial(\`hotspot-material-\${hotspot.id}\`, scene);
+      material.diffuseColor = BABYLON.Color3.FromHexString(hotspot.color);
+      material.emissiveColor = BABYLON.Color3.FromHexString(hotspot.color).scale(0.5);
+      sphere.material = material;
+
+      // Make sure the hotspot is not pickable by the camera
+      sphere.isPickable = true;
+
+      sphere.actionManager = new BABYLON.ActionManager(scene);
+      sphere.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOverTrigger,
+          () => {
+            material.emissiveColor = BABYLON.Color3.FromHexString(hotspot.color);
+            if (hotspot.activationMode === 'hover') {
+              showHotspotContent(hotspot);
+            }
+          }
+        )
+      );
+      sphere.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(
+          BABYLON.ActionManager.OnPointerOutTrigger,
+          () => {
+            material.emissiveColor = BABYLON.Color3.FromHexString(hotspot.color).scale(0.5);
+            if (hotspot.activationMode === 'hover') {
+              hideHotspotContent();
+            }
+          }
+        )
+      );
+      if (hotspot.activationMode === 'click') {
+        sphere.actionManager.registerAction(
+          new BABYLON.ExecuteCodeAction(
+            BABYLON.ActionManager.OnPickTrigger,
+            () => {
+              showHotspotContent(hotspot);
+            }
+          )
+        );
+      }
+    });
+
+    // Function to show hotspot content
+    function showHotspotContent(hotspot) {
+      const hotspotContent = document.getElementById('hotspotContent');
+      hotspotContent.innerHTML = \`
+        <h3>\${hotspot.title}</h3>
+        \${hotspot.photoUrl ? \`<img src="\${hotspot.photoUrl}" alt="\${hotspot.title}" style="width: 100%; margin-bottom: 10px; border-radius: 5px;">\` : ''}
+        \${hotspot.information ? \`<p>\${hotspot.information}</p>\` : ''}
+        \${hotspot.activationMode === 'click' ? '<button onclick="hideHotspotContent()" style="width: 100%; padding: 10px; background-color: #4CAF50; border: none; color: white; cursor: pointer; border-radius: 5px;">Close</button>' : ''}
+      \`;
+      hotspotContent.style.display = 'block';
+      positionHotspotContent(hotspotContent);
+    }
+
+    // Function to hide hotspot content
+    function hideHotspotContent() {
+      const hotspotContent = document.getElementById('hotspotContent');
+      hotspotContent.style.display = 'none';
+    }
+
+    // Function to position hotspot content near the mouse
+    function positionHotspotContent(element) {
+      const rect = element.getBoundingClientRect();
+      let left = scene.pointerX + 10;
+      let top = scene.pointerY + 10;
+
+      if (left + rect.width > window.innerWidth) {
+        left = window.innerWidth - rect.width - 10;
+      }
+      if (top + rect.height > window.innerHeight) {
+        top = window.innerHeight - rect.height - 10;
+      }
+
+      element.style.left = \`\${left}px\`;
+      element.style.top = \`\${top}px\`;
+    }
     // Handle scroll events
     window.addEventListener('wheel', (event) => {
       if (animatingToPath) return;

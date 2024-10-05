@@ -1,6 +1,5 @@
 // src/App.tsx
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import "./App.css";
 import * as BABYLON from "@babylonjs/core";
 import "@babylonjs/loaders";
 
@@ -17,6 +16,8 @@ import { generateExportedHTML } from "./tools/GenerateExportedHtml";
 import loadModelFile from "./tools/LoadModelFile";
 import { wheelHandler } from "./tools/WheelHandler";
 import WaypointVisualizer from './components/WaypointVisualizer';
+import HotspotManager from "./components/HotspotManager";
+import { Hotspot } from "./components/HotspotManager";
 
 // Define default settings
 const DEFAULT_SETTINGS = {
@@ -66,6 +67,7 @@ interface SaveFile {
   backgroundColor: string;
   waypoints: Waypoint[];
   loadedModelUrl: string | null;
+  hotspots: Hotspot[];
 }
 
 const App: React.FC = () => {
@@ -124,6 +126,7 @@ const App: React.FC = () => {
   const [customModelUrl, setCustomModelUrl] = useState<string>("");
   const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
   const [infoPopupText, setInfoPopupText] = useState<string | null>(null);
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
 
   const sceneRef = useRef<BABYLON.Scene | null>(null);
   const cameraRef = useRef<BABYLON.UniversalCamera | null>(null);
@@ -137,6 +140,7 @@ const App: React.FC = () => {
   const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
   const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
   const activeWaypointsRef = useRef<Set<number>>(new Set());
+
 
   const resetSettings = () => {
     setScrollSpeed(DEFAULT_SETTINGS.scrollSpeed);
@@ -210,12 +214,13 @@ const App: React.FC = () => {
       backgroundColor,
       waypoints,
       loadedModelUrl,
+      hotspots, // Include hotspots in the save data
     };
-
+  
     const jsonString = JSON.stringify(saveData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-
+  
     const a = document.createElement("a");
     a.href = url;
     a.download = "scene_save.json";
@@ -230,13 +235,34 @@ const App: React.FC = () => {
       reader.onload = (e) => {
         try {
           const saveData: SaveFile = JSON.parse(e.target?.result as string);
+  
+          // Reconstruct BABYLON.Vector3 for waypoints
+          const reconstructedWaypoints = saveData.waypoints.map(wp => ({
+            ...wp,
+            rotation: new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w),
+          }));
+  
+          // Reconstruct BABYLON.Vector3 for hotspots
+          console.log("saveData: ", saveData);
+          const reconstructedHotspots = saveData.hotspots.map(h => ({
+            ...h,
+            position: new BABYLON.Vector3(h.position._x, h.position._y, h.position._z),
+            scale: new BABYLON.Vector3(h.scale._x, h.scale._y, h.scale._z),
+          }));
+          
+          // Update state
           setScrollSpeed(saveData.scrollSpeed);
           setAnimationFrames(saveData.animationFrames);
           setCameraMovementSpeed(saveData.cameraMovementSpeed);
           setCameraRotationSensitivity(saveData.cameraRotationSensitivity);
           setBackgroundColor(saveData.backgroundColor);
-          setWaypoints(saveData.waypoints);
+          setWaypoints(reconstructedWaypoints);
           setLoadedModelUrl(saveData.loadedModelUrl);
+          setHotspots(reconstructedHotspots);
+          console.log("Reconstructed waypoints:", reconstructedWaypoints);
+          console.log("Reconstructed hotspots:", reconstructedHotspots);
+  
+          // Optionally, reinitialize other scene elements if necessary
         } catch (error) {
           console.error("Error parsing save file:", error);
           alert("Error loading save file. Please make sure it's a valid JSON file.");
@@ -245,7 +271,7 @@ const App: React.FC = () => {
       reader.readAsText(file);
     }
   };
-
+  
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -543,7 +569,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     console.log("Disposing old meshes: ", loadedMeshesRef.current);
-    sceneRef.current?.meshes.forEach(mesh => mesh.dispose());
+    loadedMeshesRef.current?.forEach(mesh => mesh.dispose());
     
     if (loadedModelUrl && sceneRef.current) {
       const loadedModels = loadModelFile(
@@ -554,6 +580,7 @@ const App: React.FC = () => {
         setIsModelLocal,
         infoTextRef
       );
+      
       if(loadedModels){
         loadedMeshesRef.current = loadedModels;
       }
@@ -625,7 +652,8 @@ const App: React.FC = () => {
       cameraMovementSpeed,
       cameraRotationSensitivity,
       scrollSpeed,
-      animationFrames
+      animationFrames,
+      hotspots
     );
 
     const blob = new Blob([htmlContent], { type: "text/html" });
@@ -804,6 +832,11 @@ const App: React.FC = () => {
           isEditMode={isEditMode}
          />
        )}
+
+      {sceneRef.current && cameraRef.current && (
+        <HotspotManager scene={sceneRef.current} camera={cameraRef.current}       hotspots={hotspots}
+        setHotspots={setHotspots} />
+      )}
 
       <canvas
         ref={canvasRef}
