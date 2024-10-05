@@ -1,16 +1,5 @@
 import React from "react";
 import Draggable from "react-draggable";
-import Cookies from "js-cookie";
-
-// Define cookie keys
-const COOKIE_KEYS = {
-  scrollSpeed: "scrollSpeed",
-  animationFrames: "animationFrames",
-  cameraMovementSpeed: "cameraMovementSpeed",
-  cameraRotationSensitivity: "cameraRotationSensitivity",
-  backgroundColor: "backgroundColor",
-  // Add more keys if needed
-};
 
 interface LoadSaveExportMenuProps {
   setLoadedModelUrl: React.Dispatch<React.SetStateAction<string | null>>;
@@ -19,6 +8,8 @@ interface LoadSaveExportMenuProps {
   setCustomModelUrl: React.Dispatch<React.SetStateAction<string>>;
   handleExport: () => void;
   resetSettings: () => void;
+  saveToJson: () => void;
+  loadFromJson: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
@@ -28,6 +19,8 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
   setCustomModelUrl,
   handleExport,
   resetSettings,
+  saveToJson,
+  loadFromJson,
 }) => {
   const baseURL = "https://assets.babylonjs.com/splats/";
   const models = [
@@ -43,20 +36,9 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
   };
 
   const handleClear = () => {
-    // Confirm with the user before clearing settings
     const confirmClear = window.confirm("Are you sure you want to clear all settings?");
     if (!confirmClear) return;
-
-    // Remove all relevant cookies
-    Object.values(COOKIE_KEYS).forEach((key) => {
-      Cookies.remove(key);
-    });
-
-    // Reset settings in the app
     resetSettings();
-
-    // Optionally, reload the page to apply default settings immediately
-    // window.location.reload();
   };
 
   return (
@@ -94,7 +76,6 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
             {splat}
           </button>
         ))}
-        {/* Custom URL Input */}
         <div style={{ marginTop: "10px" }}>
           <input
             type="text"
@@ -139,12 +120,53 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
               color: "white",
               border: "none",
               cursor: "pointer",
+              marginBottom: "10px",
             }}
           >
             Export Scene
           </button>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <button
+              onClick={saveToJson}
+              style={{
+                flex: 1,
+                padding: "6px 12px",
+                backgroundColor: "#28a745",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+                borderRadius: "3px",
+                fontSize: "14px",
+                marginRight: "5px",
+              }}
+            >
+              Save Project
+            </button>
+            <label
+              htmlFor="load-json"
+              style={{ 
+                flex: 1,
+                padding: "6px 12px",
+                backgroundColor: "#17a2b8",
+                color: "white",
+                border: "none",
+                borderRadius: "3px",
+                fontSize: "14px",
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              Load Project
+            </label>
+            <input
+              id="load-json"
+              type="file"
+              accept=".json"
+              onChange={loadFromJson}
+              style={{ display: 'none' }}
+            />
+          </div>
         </div>
-        {/* Clear Button */}
         <div style={{ marginTop: "10px" }}>
           <button
             onClick={handleClear}
@@ -160,7 +182,7 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
             }}
             title="Clear all settings"
           >
-            Clear
+            Reset All
           </button>
         </div>
       </div>

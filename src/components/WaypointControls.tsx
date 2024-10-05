@@ -13,6 +13,17 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
+  const getQuaternionFromRotation = (rotation: any): BABYLON.Quaternion => {
+    if (rotation instanceof BABYLON.Quaternion) {
+      return rotation;
+    } else if (rotation && typeof rotation === 'object' && 'x' in rotation && 'y' in rotation && 'z' in rotation && 'w' in rotation) {
+      return new BABYLON.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+    } else {
+      console.warn('Invalid rotation format, using default Quaternion');
+      return BABYLON.Quaternion.Identity();
+    }
+  };
+
   const handleWaypointChange = (
     index: number,
     axis: "x" | "y" | "z" | "rotationX" | "rotationY" | "rotationZ",
@@ -22,9 +33,10 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
     if (axis === "x" || axis === "y" || axis === "z") {
       newWaypoints[index][axis] = parseFloat(value);
     } else {
-      const rotation = newWaypoints[index].rotation.toEulerAngles();
-      rotation[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z'] = parseFloat(value);
-      newWaypoints[index].rotation = BABYLON.Quaternion.FromEulerAngles(rotation.x, rotation.y, rotation.z);
+      const quaternion = getQuaternionFromRotation(newWaypoints[index].rotation);
+      const euler = quaternion.toEulerAngles();
+      euler[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z'] = parseFloat(value);
+      newWaypoints[index].rotation = BABYLON.Quaternion.FromEulerAngles(euler.x, euler.y, euler.z);
     }
     setWaypoints(newWaypoints);
   };
@@ -175,7 +187,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({ waypoints, setWaypo
                         type="number"
                         step="0.1"
                         value={axis.startsWith("rotation") 
-                          ? wp.rotation.toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']
+                          ? getQuaternionFromRotation(wp.rotation).toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']
                           : wp[axis as "x" | "y" | "z"]}
                         onChange={(e) => handleWaypointChange(index, axis as "x" | "y" | "z" | "rotationX" | "rotationY" | "rotationZ", e.target.value)}
                         style={{
