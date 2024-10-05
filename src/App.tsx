@@ -797,6 +797,8 @@ const App: React.FC = () => {
         setCameraMovementSpeed={setCameraMovementSpeed}
         cameraRotationSensitivity={cameraRotationSensitivity}
         setCameraRotationSensitivity={setCameraRotationSensitivity}
+        backgroundColor={backgroundColor}
+        setBackgroundColor={setBackgroundColor}
       />
       <ScrollControls
         scrollPercentage={scrollPercentage}
@@ -813,10 +815,6 @@ const App: React.FC = () => {
         resetSettings={resetSettings}
         saveToJson={saveToJson}
         loadFromJson={loadFromJson}
-      />
-      <BackgroundColorSelector
-        backgroundColor={backgroundColor}
-        setBackgroundColor={setBackgroundColor}
       />
       <GitHubLink repoUrl="https://github.com/SonnyC56/gaussian-splatting-viewer" />
 

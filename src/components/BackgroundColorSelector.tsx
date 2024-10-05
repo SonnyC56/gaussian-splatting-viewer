@@ -1,47 +1,53 @@
+// BackgroundColorSelector.tsx
 import React from 'react';
-import Draggable from 'react-draggable';
+import styled from 'styled-components';
 
 interface BackgroundColorSelectorProps {
   backgroundColor: string;
   setBackgroundColor: (color: string) => void;
 }
 
-const BackgroundColorSelector: React.FC<BackgroundColorSelectorProps> = ({ backgroundColor, setBackgroundColor }) => {
+// Styled container to match ParameterControls styling
+const ColorSelectorContainer = styled.div`
+  margin-top: 10px;
+  padding: 8px;
+  background-color: #2c2c2c;
+  border-radius: 4px;
+`;
 
+const Title = styled.h4`
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #ffffff;
+`;
 
+const ColorInput = styled.input`
+  width: 100%;
+  height: 36px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+
+  &:focus {
+    outline: none;
+  }
+`;
+
+const BackgroundColorSelector: React.FC<BackgroundColorSelectorProps> = ({
+  backgroundColor,
+  setBackgroundColor,
+}) => {
   return (
-    <Draggable handle=".handle">
-      <div
-        className="handle"
-        style={{
-          position: 'absolute',
-          bottom: '220px',
-          width: '200px',
-          left: '10px',
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          padding: '10px',
-          borderRadius: '5px',
-          color: 'white',
-          zIndex: 10,
-          cursor: 'move',
-        }}
-      >
-          <div style={{ marginTop: '10px' }}>
-            <h3 style={{ margin: '0 0 10px 0' }}>Background Color</h3>
-            <input
-              type="color"
-              value={backgroundColor}
-              onChange={(e) => setBackgroundColor(e.target.value)}
-              style={{
-                width: '100%',
-                height: '40px',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            />
-          </div>
-      </div>
-    </Draggable>
+    <ColorSelectorContainer>
+      <Title>Background Color</Title>
+      <ColorInput
+        type="color"
+        value={backgroundColor}
+        onChange={(e) => setBackgroundColor(e.target.value)}
+      />
+    </ColorSelectorContainer>
   );
 };
 

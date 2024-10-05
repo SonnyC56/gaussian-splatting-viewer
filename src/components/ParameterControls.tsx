@@ -3,8 +3,9 @@ import React, { useState } from "react";
 import Draggable from "react-draggable";
 import styled from "styled-components";
 import { FiSettings } from "react-icons/fi";
+import BackgroundColorSelector from "./BackgroundColorSelector"; // Adjust the import path as needed
 
-// Define the interface for custom props (excluding showScrollControls)
+// Extend the interface to include backgroundColor props
 interface ParameterControlsProps {
   scrollSpeed: number;
   setScrollSpeed: React.Dispatch<React.SetStateAction<number>>;
@@ -14,6 +15,8 @@ interface ParameterControlsProps {
   setCameraMovementSpeed: React.Dispatch<React.SetStateAction<number>>;
   cameraRotationSensitivity: number;
   setCameraRotationSensitivity: React.Dispatch<React.SetStateAction<number>>;
+  backgroundColor: string; // New prop
+  setBackgroundColor: (color: string) => void; // New prop
 }
 
 const Handle = styled.div<{ isDraggingDisabled: boolean }>`
@@ -110,6 +113,8 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
   setCameraMovementSpeed,
   cameraRotationSensitivity,
   setCameraRotationSensitivity,
+  backgroundColor, // New prop
+  setBackgroundColor, // New prop
 }) => {
   // Internal state to manage visibility
   const [showControls, setShowControls] = useState<boolean>(true);
@@ -194,6 +199,12 @@ const ParameterControls: React.FC<ParameterControlsProps> = ({
                 onBlur={handleBlur}
               />
             </ControlRow>
+
+            {/* Background Color Selector */}
+            <BackgroundColorSelector
+              backgroundColor={backgroundColor}
+              setBackgroundColor={setBackgroundColor}
+            />
           </ControlsContainer>
         )}
       </Handle>

@@ -16,8 +16,8 @@ interface ScrollControlsProps {
 
 const Handle = styled.div<{ isDraggingDisabled: boolean }>`
   position: absolute;
-  bottom: 335px;
-  left: 10px;
+  top: 10px;
+  left: 350px;
   transform: translateY(-50%);
   background-color: #1e1e1e; /* Dark background */
   padding: 16px; /* Reduced padding for tighter layout */
@@ -26,7 +26,7 @@ const Handle = styled.div<{ isDraggingDisabled: boolean }>`
   z-index: 1000;
   cursor: ${({ isDraggingDisabled }) => (isDraggingDisabled ? "not-allowed" : "move")};
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  width: 250px; /* Adjusted width */
+  width: 280px; /* Adjusted width */
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   transition: background-color 0.3s ease, cursor 0.3s ease;
 
