@@ -312,7 +312,7 @@ const App: React.FC = () => {
     camera.rotationQuaternion = waypoints[0].rotation.clone();
 
     // Optionally, set the Euler rotation to match (if needed)
-    camera.rotation = camera.rotationQuaternion.toEulerAngles();
+    // camera.rotation = camera.rotationQuaternion.toEulerAngles();
 
     camera.keysUp.push(87);
     camera.keysDown.push(83);
@@ -419,21 +419,11 @@ const App: React.FC = () => {
     const pointerObservable = scene.onPointerObservable.add(function (evt) {
       if (evt.type === BABYLON.PointerEventTypes.POINTERDOWN) {
         userControlRef.current = true;
-
-        if (camera.rotationQuaternion) {
-          camera.rotation = camera.rotationQuaternion.toEulerAngles();
-          (camera as any).rotationQuaternion = null;
-        }
       }
     });
 
     const keydownHandlerInternal = () => {
       userControlRef.current = true;
-
-      if (camera.rotationQuaternion) {
-        camera.rotation = camera.rotationQuaternion.toEulerAngles();
-        (camera as any).rotationQuaternion = null;
-      }
     };
     window.addEventListener("keydown", keydownHandlerInternal);
 
