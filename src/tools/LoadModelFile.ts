@@ -45,16 +45,14 @@ const loadModelFile = async (
     let isLocal = false;
 
     if (typeof fileOrUrl === "string") {
+      console.log("Loading model from URL:", fileOrUrl);
       // Load from URL
-      result = await BABYLON.SceneLoader.ImportMeshAsync("", "", fileOrUrl, scene);
+      result = await BABYLON.SceneLoader.ImportMeshAsync("", fileOrUrl, "", scene);
       isLocal = false;
     } else {
-      // Load from File - Create a blob URL
-      const blobUrl = URL.createObjectURL(fileOrUrl);
-      result = await BABYLON.SceneLoader.ImportMeshAsync("", blobUrl, "", scene);
+      console.log("Loading model from file:", fileOrUrl.name);
+      result = await BABYLON.SceneLoader.ImportMeshAsync("", "", fileOrUrl, scene);
       isLocal = true;
-      // Revoke the blob URL after loading
-      URL.revokeObjectURL(blobUrl);
     }
 
     if (!isComponentMounted) return;
