@@ -160,7 +160,7 @@ export const generateExportedHTML = (
     if (controlPoints.length >= 2) {
       const positionCurve = BABYLON.Curve3.CreateCatmullRomSpline(
         controlPoints,
-        (waypoints.length - 1) * 10,
+        (waypoints.length - 1) * 20, // Increased resolution from 10 to 20
         false
       );
       path = positionCurve.getPoints();
@@ -175,12 +175,12 @@ export const generateExportedHTML = (
 
     hotspots.forEach(hotspot => {
       // Assign default scale if necessary
-      const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
+      const scale = (hotspot.scale.x === 0 && hotspot.scale.y === 0 && hotspot.scale.z === 0)
         ? new BABYLON.Vector3(1, 1, 1) // Default scale
-        : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
+        : new BABYLON.Vector3(hotspot.scale.x, hotspot.scale.y, hotspot.scale.z);
 
       const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
-      sphere.position = new BABYLON.Vector3(hotspot.position._x, hotspot.position._y, hotspot.position._z);
+      sphere.position = new BABYLON.Vector3(hotspot.position.x, hotspot.position.y, hotspot.position.z);
       sphere.scaling = scale;
       console.log('created sphere, position:', sphere.position, 'scale:', sphere.scaling);
       
@@ -409,6 +409,10 @@ export const generateExportedHTML = (
       return { index: closestIndex, distanceSquared: minDist };
     }
 
+    // Initialize target rotation and position
+    let targetRotation = camera.rotationQuaternion.clone();
+    let targetPosition = camera.position.clone();
+
     engine.runRenderLoop(function () {
       // Smoothly interpolate scrollPosition towards scrollTarget
       const scrollInterpolationSpeed = 0.1;
@@ -427,42 +431,61 @@ export const generateExportedHTML = (
           const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
           const lerpFactor = segmentT - clampedSegmentIndex;
 
-          const newPosition = path[Math.floor(scrollPosition)];
-
+          // Calculate target rotation using Slerp
           const r1 = rotations[clampedSegmentIndex];
           const r2 = rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
 
-          const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor).normalize();
+          targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor).normalize();
 
-          camera.position.copyFrom(newPosition);
+          // Calculate interpolated position using Lerp
+          const floorIndex = Math.floor(scrollPosition);
+          const ceilIndex = Math.min(floorIndex + 1, path.length - 1);
+          const lerpFactorPos = scrollPosition - floorIndex;
 
-          if (!camera.rotationQuaternion) {
-            camera.rotationQuaternion = new BABYLON.Quaternion();
-          }
-          camera.rotationQuaternion.copyFrom(newRotation);
+          const interpolatedPosition = BABYLON.Vector3.Lerp(
+            path[floorIndex],
+            path[ceilIndex],
+            lerpFactorPos
+          );
 
-   // Check for waypoint triggers
-          waypoints.forEach((wp, index) => {
-            const distance = BABYLON.Vector3.Distance(
-              camera.position,
-              new BABYLON.Vector3(wp.x, wp.y, wp.z)
-            );
-            const triggerDistance = 1.0; // Define a suitable trigger distance
-
-            if (distance <= triggerDistance) {
-              executeInteractions(wp.interactions);
-            } else {
-              reverseInteractions(wp.interactions);
-            }
-          });
+          targetPosition = interpolatedPosition;
         } else if (rotations.length === 1) {
-          camera.position.copyFrom(path[0]);
-          if (!camera.rotationQuaternion) {
-            camera.rotationQuaternion = new BABYLON.Quaternion();
-          }
-          camera.rotationQuaternion.copyFrom(rotations[0]);
+          targetRotation = rotations[0].clone();
+          targetPosition = path[0].clone();
         }
       }
+
+      // Smoothly interpolate the camera's rotation towards the target rotation
+      if (camera.rotationQuaternion) {
+        camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
+          camera.rotationQuaternion,
+          targetRotation,
+          0.05 // Damping factor for rotation (adjust between 0 and 1 for smoothness)
+        ).normalize();
+      }
+
+      // Smoothly interpolate the camera's position towards the target position
+      const positionDampingFactor = 0.1; // Adjust between 0 (no movement) and 1 (instant movement)
+      camera.position = BABYLON.Vector3.Lerp(
+        camera.position,
+        targetPosition,
+        positionDampingFactor
+      );
+
+      // Handle interactions based on waypoints
+      waypoints.forEach((wp, index) => {
+        const distance = BABYLON.Vector3.Distance(
+          camera.position,
+          new BABYLON.Vector3(wp.x, wp.y, wp.z)
+        );
+        const triggerDistance = 1.0; // Define a suitable trigger distance
+
+        if (distance <= triggerDistance) {
+          executeInteractions(wp.interactions);
+        } else {
+          reverseInteractions(wp.interactions);
+        }
+      });
 
       scene.render();
     });

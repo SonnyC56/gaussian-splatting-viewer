@@ -140,6 +140,7 @@ const App: React.FC = () => {
   const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
   const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
   const activeWaypointsRef = useRef<Set<number>>(new Set());
+  const targetRotationRef = useRef<BABYLON.Quaternion>(waypoints[0].rotation.clone());
 
 
   const resetSettings = () => {
@@ -453,66 +454,81 @@ const App: React.FC = () => {
       if (isComponentMounted && sceneRef.current && cameraRef.current) {
         const scene = sceneRef.current;
         const camera = cameraRef.current;
+        
         // Update scroll position smoothly
         const scrollInterpolationSpeed = 0.1;
         scrollPositionRef.current +=
           (scrollTargetRef.current - scrollPositionRef.current) *
           scrollInterpolationSpeed;
+        
         // Clamp scroll position
         scrollPositionRef.current = Math.max(
           0,
           Math.min(scrollPositionRef.current, pathRef.current.length - 1)
         );
+        
         // Update scroll percentage
         const newScrollPercentage =
           pathRef.current.length > 1
             ? (scrollPositionRef.current / (pathRef.current.length - 1)) * 100
             : 0;
         setScrollPercentage(newScrollPercentage);
+        
         if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
           const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
           const totalSegments = waypoints.length - 1;
+          
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
             const segmentIndex = Math.floor(segmentT);
-            const clampedSegmentIndex = Math.min(
-              segmentIndex,
-              totalSegments - 1
-            );
+            const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
             const lerpFactor = segmentT - clampedSegmentIndex;
-
-            const newPosition =
-              pathRef.current[Math.floor(scrollPositionRef.current)];
-
+            
             const r1 = rotationsRef.current[clampedSegmentIndex];
-            const r2 =
-              rotationsRef.current[clampedSegmentIndex + 1] ||
-              rotationsRef.current[rotationsRef.current.length - 1];
-
-            const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
-
-            camera.position.copyFrom(newPosition);
-
-            if (!camera.rotationQuaternion) {
-              camera.rotationQuaternion = new BABYLON.Quaternion();
-            }
-            camera.rotationQuaternion.copyFrom(newRotation);
+            const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
+            
+            // Calculate the target rotation using Slerp
+            const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
+            targetRotationRef.current = targetRotation;
           } else if (rotationsRef.current.length === 1) {
-            camera.position.copyFrom(pathRef.current[0]);
-            if (!camera.rotationQuaternion) {
-              camera.rotationQuaternion = new BABYLON.Quaternion();
-            }
-            camera.rotationQuaternion.copyFrom(rotationsRef.current[0]);
+            targetRotationRef.current = rotationsRef.current[0].clone();
           }
+      
+        
+        // Smoothly interpolate the camera's rotation towards the target rotation
+        if (camera.rotationQuaternion) {
+          camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
+            camera.rotationQuaternion,
+            targetRotationRef.current,
+            0.05 // Damping factor (adjust between 0 and 1 for smoothness)
+          ).normalize();
         }
+        
+// Calculate the floor and ceil indices based on scrollPositionRef.current
+const floorIndex = Math.floor(scrollPositionRef.current);
+const ceilIndex = Math.min(floorIndex + 1, pathRef.current.length - 1);
 
+// Calculate the interpolation factor (fractional part)
+const lerpFactor = scrollPositionRef.current - floorIndex;
+
+// Interpolate between the two positions
+const newPosition = BABYLON.Vector3.Lerp(
+  pathRef.current[floorIndex],
+  pathRef.current[ceilIndex],
+  lerpFactor
+);
+
+// Update the camera's position
+        camera.position.copyFrom(newPosition);
+        
+        // Handle interactions based on waypoints
         waypoints.forEach((wp, index) => {
           const distance = BABYLON.Vector3.Distance(
             camera.position,
             new BABYLON.Vector3(wp.x, wp.y, wp.z)
           );
           const triggerDistance = 1.0;
-
+          
           if (distance <= triggerDistance) {
             if (!activeWaypointsRef.current.has(index)) {
               activeWaypointsRef.current.add(index);
@@ -525,11 +541,12 @@ const App: React.FC = () => {
             }
           }
         });
-
+      }
+        
         scene.render();
       }
     });
-
+    
     const resizeHandler = () => {
       engine.resize();
     };
