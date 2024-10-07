@@ -175,12 +175,12 @@ export const generateExportedHTML = (
 
     hotspots.forEach(hotspot => {
       // Assign default scale if necessary
-      const scale = (hotspot.scale.x === 0 && hotspot.scale.y === 0 && hotspot.scale.z === 0)
+      const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
         ? new BABYLON.Vector3(1, 1, 1) // Default scale
-        : new BABYLON.Vector3(hotspot.scale.x, hotspot.scale.y, hotspot.scale.z);
+        : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
 
       const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
-      sphere.position = new BABYLON.Vector3(hotspot.position.x, hotspot.position.y, hotspot.position.z);
+      sphere.position = new BABYLON.Vector3(hotspot.position._x, hotspot.position._y, hotspot.position._z);
       sphere.scaling = scale;
       console.log('created sphere, position:', sphere.position, 'scale:', sphere.scaling);
       

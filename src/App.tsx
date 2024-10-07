@@ -614,6 +614,7 @@ const newPosition = BABYLON.Vector3.Lerp(
           console.log("Loaded models: ", loadedModels);
           if (loadedModels && Array.isArray(loadedModels)) {
             loadedMeshesRef.current = loadedModels;
+      
           }
         } catch (error) {
           console.error("Error loading model:", error);
@@ -659,6 +660,9 @@ const newPosition = BABYLON.Vector3.Lerp(
     pathRef.current = path;
     rotationsRef.current = rotations;
     console.log("waypints changed, rotationsRef:", rotationsRef.current);
+
+
+
   }, [waypoints]);
 
   useEffect(() => {
