@@ -30,7 +30,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
 
   const getQuaternionFromRotation = (rotation: any): BABYLON.Quaternion => {
     if (rotation instanceof BABYLON.Quaternion) {
-      return rotation;
+      return rotation.clone(); // Ensure a unique instance
     } else if (rotation && typeof rotation === 'object' && 'x' in rotation && 'y' in rotation && 'z' in rotation && 'w' in rotation) {
       return new BABYLON.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
     } else {
@@ -46,22 +46,29 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
   ) => {
     const newWaypoints = [...waypoints];
     if (axis === "x" || axis === "y" || axis === "z") {
-      newWaypoints[index][axis] = parseFloat(value);
+      newWaypoints[index] = { ...newWaypoints[index], [axis]: parseFloat(value) };
     } else {
       const quaternion = getQuaternionFromRotation(newWaypoints[index].rotation);
       const euler = quaternion.toEulerAngles();
       euler[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z'] = parseFloat(value);
-      newWaypoints[index].rotation = BABYLON.Quaternion.FromEulerAngles(euler.x, euler.y, euler.z);
+      newWaypoints[index] = {
+        ...newWaypoints[index],
+        rotation: BABYLON.Quaternion.FromEulerAngles(euler.x, euler.y, euler.z),
+      };
     }
     setWaypoints(newWaypoints);
   };
 
   const addWaypoint = () => {
+    const camera = scene?.activeCamera;
+    const cameraRotation = camera?.absoluteRotation;
+    const cameraPosition = camera?.position;
+
     const newWaypoint: Waypoint = {
-      x: scene?.activeCamera?.position._x ?? 0,
-      y:  scene?.activeCamera?.position._y ?? 0,
-      z:  scene?.activeCamera?.position._z ?? 0,
-      rotation: scene?.activeCamera?.absoluteRotation ?? BABYLON.Quaternion.Identity(),
+      x: cameraPosition ? cameraPosition.x : 0,
+      y: cameraPosition ? cameraPosition.y : 0,
+      z: cameraPosition ? cameraPosition.z : 0,
+      rotation: cameraRotation ? cameraRotation.clone() : BABYLON.Quaternion.Identity(), // Clone the Quaternion
       interactions: [],
     };
     setWaypoints([...waypoints, newWaypoint]);
@@ -87,7 +94,10 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
   const updateWaypointInteractions = (interactions: Interaction[]) => {
     if (editingWaypointIndex !== null) {
       const newWaypoints = [...waypoints];
-      newWaypoints[editingWaypointIndex].interactions = interactions;
+      newWaypoints[editingWaypointIndex] = { 
+        ...newWaypoints[editingWaypointIndex], 
+        interactions: interactions 
+      };
       setWaypoints(newWaypoints);
     }
   };
@@ -298,7 +308,7 @@ const WaypointControls: React.FC<WaypointControlsProps> = ({
                           <input
                             type="number"
                             step="0.1"
-                            value={getQuaternionFromRotation(wp.rotation).toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']}
+                            value={BABYLON.Angle.FromRadians(getQuaternionFromRotation(wp.rotation).toEulerAngles()[axis.charAt(8).toLowerCase() as 'x' | 'y' | 'z']).degrees()}
                             onChange={(e) => handleWaypointChange(index, axis as "rotationX" | "rotationY" | "rotationZ", e.target.value)}
                             style={{
                               width: "60px",
