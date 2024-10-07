@@ -79,35 +79,35 @@ const App: React.FC = () => {
       x: 0,
       y: 0,
       z: -10,
-      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0),
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0).normalize(),
       interactions: [],
     },
     {
       x: 0,
       y: 0,
       z: -8,
-      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0),
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0).normalize(),
       interactions: [],
     },
     {
       x: 0,
       y: 0,
       z: -6,
-      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0),
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0).normalize(),
       interactions: [],
     },
     {
       x: 0,
       y: 0,
       z: -4,
-      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0),
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0).normalize(),
       interactions: [],
     },
     {
       x: 0,
       y: 0,
       z: -2,
-      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0),
+      rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0).normalize(),
       interactions: [],
     },
   ]);
@@ -156,35 +156,35 @@ const App: React.FC = () => {
         x: 0,
         y: 0,
         z: -10,
-        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0),
+        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0, 0).normalize(),
         interactions: [],
       },
       {
         x: 0,
         y: 0,
         z: -8,
-        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0),
+        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.1, 0).normalize(),
         interactions: [],
       },
       {
         x: 0,
         y: 0,
         z: -6,
-        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0),
+        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.2, 0).normalize(),
         interactions: [],
       },
       {
         x: 0,
         y: 0,
         z: -4,
-        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0),
+        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.3, 0).normalize(),
         interactions: [],
       },
       {
         x: 0,
         y: 0,
         z: -2,
-        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0),
+        rotation: BABYLON.Quaternion.FromEulerAngles(0, 0.4, 0).normalize(),
         interactions: [],
       },
     ]);
@@ -239,9 +239,8 @@ const App: React.FC = () => {
           // Reconstruct BABYLON.Vector3 for waypoints
           const reconstructedWaypoints = saveData.waypoints.map(wp => ({
             ...wp,
-            rotation: new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w),
+            rotation: new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w).normalize(),
           }));
-  
           // Reconstruct BABYLON.Vector3 for hotspots
           console.log("saveData: ", saveData);
           const reconstructedHotspots = saveData.hotspots.map(h => ({
@@ -306,6 +305,13 @@ const App: React.FC = () => {
 
     camera.speed = cameraMovementSpeed;
     camera.angularSensibility = cameraRotationSensitivity;
+
+
+    // Initialize rotationQuaternion with the first waypoint's rotation
+    camera.rotationQuaternion = waypoints[0].rotation.clone();
+
+    // Optionally, set the Euler rotation to match (if needed)
+    camera.rotation = camera.rotationQuaternion.toEulerAngles();
 
     camera.keysUp.push(87);
     camera.keysDown.push(83);
@@ -389,7 +395,7 @@ const App: React.FC = () => {
     const controlPoints = waypoints.map(
       (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
     );
-    const rotations = waypoints.map((wp) => wp.rotation);
+    const rotations = waypoints.map(wp => new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w));
 
     let path: BABYLON.Vector3[] = [];
 
@@ -444,26 +450,27 @@ const App: React.FC = () => {
     });
 
     engine.runRenderLoop(function () {
-      if (isComponentMounted) {
+      if (isComponentMounted && sceneRef.current && cameraRef.current) {
+        const scene = sceneRef.current;
+        const camera = cameraRef.current;
+        // Update scroll position smoothly
         const scrollInterpolationSpeed = 0.1;
         scrollPositionRef.current +=
           (scrollTargetRef.current - scrollPositionRef.current) *
           scrollInterpolationSpeed;
-
-        if (scrollPositionRef.current < 0) scrollPositionRef.current = 0;
-        if (scrollPositionRef.current > pathRef.current.length - 1)
-          scrollPositionRef.current = pathRef.current.length - 1;
-
+        // Clamp scroll position
+        scrollPositionRef.current = Math.max(
+          0,
+          Math.min(scrollPositionRef.current, pathRef.current.length - 1)
+        );
+        // Update scroll percentage
         const newScrollPercentage =
           pathRef.current.length > 1
             ? (scrollPositionRef.current / (pathRef.current.length - 1)) * 100
             : 0;
         setScrollPercentage(newScrollPercentage);
-
-        if (!userControlRef.current && pathRef.current.length >= 1  && !isEditMode) {
-          const t =
-            scrollPositionRef.current / (pathRef.current.length - 1 || 1);
-
+        if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
+          const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
           const totalSegments = waypoints.length - 1;
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
@@ -618,7 +625,7 @@ const App: React.FC = () => {
     if (!sceneRef.current) return;
 
     const controlPoints = waypoints.map(wp => new BABYLON.Vector3(wp.x, wp.y, wp.z));
-    const rotations = waypoints.map(wp => wp.rotation);
+    const rotations = waypoints.map(wp => new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w));
 
     let path: BABYLON.Vector3[] = [];
     if (controlPoints.length >= 2) {
@@ -634,6 +641,7 @@ const App: React.FC = () => {
 
     pathRef.current = path;
     rotationsRef.current = rotations;
+    console.log("waypints changed, rotationsRef:", rotationsRef.current);
   }, [waypoints]);
 
   useEffect(() => {

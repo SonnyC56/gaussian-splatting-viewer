@@ -1,4 +1,3 @@
-
 export const generateExportedHTML = (
   modelUrl: string,
   includeUI: boolean,
@@ -104,6 +103,17 @@ export const generateExportedHTML = (
     camera.speed = ${cameraMovementSpeed};
     camera.angularSensibility = ${cameraRotationSensitivity};
 
+    // Initialize rotationQuaternion with the first waypoint's rotation
+    camera.rotationQuaternion = new BABYLON.Quaternion(
+      ${waypoints[0].rotation.x},
+      ${waypoints[0].rotation.y},
+      ${waypoints[0].rotation.z},
+      ${waypoints[0].rotation.w}
+    ).normalize();
+
+    // Ensure Euler angles match the quaternion
+    camera.rotation = camera.rotationQuaternion.toEulerAngles();
+
     // Enable WASD keys for movement
     camera.keysUp.push(87); // W
     camera.keysDown.push(83); // S
@@ -142,7 +152,7 @@ export const generateExportedHTML = (
       (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
     );
     const rotations = waypoints.map(
-      (wp) => new BABYLON.Quaternion(wp.rotation.x, wp.rotation.y, wp.rotation.z, wp.rotation.w)
+      (wp) => new BABYLON.Quaternion(wp.rotation.x, wp.rotation.y, wp.rotation.z, wp.rotation.w).normalize()
     );
 
     let path = [];
@@ -158,16 +168,16 @@ export const generateExportedHTML = (
       path = [controlPoints[0]];
     }
 
-  // Create hotspots
+    // Create hotspots
     const hotspots = ${JSON.stringify(hotspots)};
     console.log(hotspots);
-    //add inspector 
+    // Add inspector 
 
     hotspots.forEach(hotspot => {
- // Assign default scale if necessary
-    const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
-    ? new BABYLON.Vector3(1, 1, 1) // Default scale
-    : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
+      // Assign default scale if necessary
+      const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
+        ? new BABYLON.Vector3(1, 1, 1) // Default scale
+        : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
 
       const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
       sphere.position = new BABYLON.Vector3(hotspot.position._x, hotspot.position._y, hotspot.position._z);
@@ -179,7 +189,7 @@ export const generateExportedHTML = (
       material.emissiveColor = BABYLON.Color3.FromHexString(hotspot.color).scale(0.5);
       sphere.material = material;
 
-      // Make sure the hotspot is not pickable by the camera
+      // Make sure the hotspot is pickable by the camera
       sphere.isPickable = true;
 
       sphere.actionManager = new BABYLON.ActionManager(scene);
@@ -252,6 +262,48 @@ export const generateExportedHTML = (
       element.style.left = \`\${left}px\`;
       element.style.top = \`\${top}px\`;
     }
+
+    // Function to execute interactions
+    const executeInteractions = (interactions) => {
+      interactions.forEach((interaction) => {
+        switch (interaction.type) {
+          case "info":
+            showInfoPopup(interaction.data.text);
+            break;
+          // Add other interaction types here if needed
+        }
+      });
+    };
+
+    // Function to reverse interactions
+    const reverseInteractions = (interactions) => {
+      interactions.forEach((interaction) => {
+        switch (interaction.type) {
+          case "info":
+            hideInfoPopup();
+            break;
+          // Add other interaction types here if needed
+        }
+      });
+    };
+
+    // Function to show info popup
+    function showInfoPopup(text) {
+      const hotspotContent = document.getElementById('hotspotContent');
+      hotspotContent.innerHTML = \`
+        <p>\${text}</p>
+        <button onclick="hideInfoPopup()" style="width: 100%; padding: 10px; background-color: #4CAF50; border: none; color: white; cursor: pointer; border-radius: 5px;">Close</button>
+      \`;
+      hotspotContent.style.display = 'block';
+      positionHotspotContent(hotspotContent);
+    }
+
+    // Function to hide info popup
+    function hideInfoPopup() {
+      const hotspotContent = document.getElementById('hotspotContent');
+      hotspotContent.style.display = 'none';
+    }
+
     // Handle scroll events
     window.addEventListener('wheel', (event) => {
       if (animatingToPath) return;
@@ -265,7 +317,7 @@ export const generateExportedHTML = (
             camera.rotation.x,
             camera.rotation.y,
             camera.rotation.z
-          );
+          ).normalize();
           camera.rotation.set(0, 0, 0);
         }
 
@@ -285,7 +337,7 @@ export const generateExportedHTML = (
 
           const r1 = rotations[clampedSegmentIndex];
           const r2 = rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
-          targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
+          targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor).normalize();
         } else if (rotations.length === 1) {
           targetRotation = rotations[0];
         }
@@ -341,7 +393,7 @@ export const generateExportedHTML = (
       }
     });
 
-    // Helper function
+    // Helper function to find the closest point on the path
     function getClosestPointOnPath(position, path) {
       let minDist = Infinity;
       let closestIndex = 0;
@@ -357,38 +409,13 @@ export const generateExportedHTML = (
       return { index: closestIndex, distanceSquared: minDist };
     }
 
-    // Function to execute interactions
-    const executeInteractions = (interactions) => {
-      interactions.forEach((interaction) => {
-        switch (interaction.type) {
-          case "info":
-            showInfoPopup(interaction.data.text);
-            break;
-          // Add other interaction types here if needed
-        }
-      });
-    };
-
-    // Function to reverse interactions
-    const reverseInteractions = (interactions) => {
-      interactions.forEach((interaction) => {
-        switch (interaction.type) {
-          case "info":
-            hideInfoPopup();
-            break;
-          // Add other interaction types here if needed
-        }
-      });
-    };
-
-    // Render loop
     engine.runRenderLoop(function () {
       // Smoothly interpolate scrollPosition towards scrollTarget
       const scrollInterpolationSpeed = 0.1;
       scrollPosition += (scrollTarget - scrollPosition) * scrollInterpolationSpeed;
 
-      if (scrollPosition < 0) scrollPosition = 0;
-      if (scrollPosition > path.length - 1) scrollPosition = path.length - 1;
+      // Clamp scroll position
+      scrollPosition = Math.max(0, Math.min(scrollPosition, path.length - 1));
 
       if (!userControl && path.length >= 1) {
         const t = scrollPosition / (path.length - 1 || 1);
@@ -405,7 +432,7 @@ export const generateExportedHTML = (
           const r1 = rotations[clampedSegmentIndex];
           const r2 = rotations[clampedSegmentIndex + 1] || rotations[rotations.length - 1];
 
-          const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
+          const newRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor).normalize();
 
           camera.position.copyFrom(newPosition);
 
