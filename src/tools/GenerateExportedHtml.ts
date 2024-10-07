@@ -453,7 +453,7 @@ export const generateExportedHTML = (
           targetRotation = rotations[0].clone();
           targetPosition = path[0].clone();
         }
-      }
+      
 
       // Smoothly interpolate the camera's rotation towards the target rotation
       if (camera.rotationQuaternion) {
@@ -486,7 +486,7 @@ export const generateExportedHTML = (
           reverseInteractions(wp.interactions);
         }
       });
-
+    }
       scene.render();
     });
 
