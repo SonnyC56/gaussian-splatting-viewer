@@ -7,7 +7,7 @@ const PopupOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,30 +15,74 @@ const PopupOverlay = styled.div`
 `;
 
 const PopupContent = styled.div`
-  background-color: white;
+  background-color: #1e1e1e;
   padding: 20px;
   border-radius: 10px;
   width: 300px;
+  color: #ffffff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 `;
 
 const Title = styled.h2`
   margin-top: 0;
+  color: #ffffff;
+  font-size: 18px;
+  margin-bottom: 15px;
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 5px;
+  padding: 8px;
+  margin-bottom: 15px;
+  background-color: #2c2c2c;
+  border: 1px solid #555555;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: #4CAF50;
+  }
+`;
+
+const CheckboxContainer = styled.div`
+  display: flex;
+  align-items: center;
   margin-bottom: 10px;
 `;
 
 const Checkbox = styled.input`
-  margin-right: 5px;
-`;
-
-const Button = styled.button`
-  padding: 10px;
   margin-right: 10px;
   cursor: pointer;
+`;
+
+const CheckboxLabel = styled.label`
+  font-size: 14px;
+  cursor: pointer;
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+`;
+
+const Button = styled.button<{ primary?: boolean }>`
+  padding: 8px 16px;
+  margin-left: 10px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background-color 0.3s;
+
+  background-color: ${props => props.primary ? '#4CAF50' : '#555555'};
+  color: #ffffff;
+
+  &:hover {
+    background-color: ${props => props.primary ? '#45a049' : '#666666'};
+  }
 `;
 
 interface ExportPopupProps {
@@ -75,28 +119,28 @@ const ExportPopup: React.FC<ExportPopupProps> = ({ onExport, onCancel, isModelLo
             />
           </>
         )}
-        <div>
+        <CheckboxContainer>
           <Checkbox
             type="checkbox"
             checked={includeScrollControls}
             onChange={() => setIncludeScrollControls(!includeScrollControls)}
             id="includeScrollControls"
           />
-          <label htmlFor="includeScrollControls">Include scroll controls</label>
-        </div>
-        <div>
+          <CheckboxLabel htmlFor="includeScrollControls">Include scroll controls</CheckboxLabel>
+        </CheckboxContainer>
+        <CheckboxContainer>
           <Checkbox
             type="checkbox"
             checked={includeMovementInstructions}
             onChange={() => setIncludeMovementInstructions(!includeMovementInstructions)}
             id="includeMovementInstructions"
           />
-          <label htmlFor="includeMovementInstructions">Include movement instructions</label>
-        </div>
-        <div>
-          <Button onClick={handleExport}>Export</Button>
+          <CheckboxLabel htmlFor="includeMovementInstructions">Include movement instructions</CheckboxLabel>
+        </CheckboxContainer>
+        <ButtonContainer>
           <Button onClick={onCancel}>Cancel</Button>
-        </div>
+          <Button primary onClick={handleExport}>Export</Button>
+        </ButtonContainer>
       </PopupContent>
     </PopupOverlay>
   );
