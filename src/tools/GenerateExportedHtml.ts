@@ -144,9 +144,54 @@ export const generateExportedHTML = (
       cursor: pointer;
       z-index: 1000;
     }
+
+    #preloader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease-out;
+    }
+
+    #preloader.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #preloader h1 {
+      font-size: 48px;
+      color: #ffffff;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+    }
+
+    #preloader .spinner {
+      width: 25px;
+      height: 25px;
+      border: 5px solid #ffffff;
+      border-top: 5px solid #F76900;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
+<div id="preloader">
+      <h1>Story Splat</h1>
+      <div class="spinner"></div>
+  </div>
   <canvas id="renderCanvas"></canvas>
   ${includeMovementInstructions ? `
   <div class="ui-overlay">
@@ -175,6 +220,7 @@ export const generateExportedHTML = (
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script>
+    const preloader = document.getElementById('preloader');
     // Get the canvas element
     const canvas = document.getElementById('renderCanvas');
 
@@ -236,10 +282,13 @@ export const generateExportedHTML = (
             mesh.position = BABYLON.Vector3.Zero();
           }
         });
+        // Hide the preloader after the model is loaded
+        preloader.classList.add('hidden');
       })
       .catch((error) => {
         console.error('Error loading model file:', error);
         alert('Error loading model file: ' + error.message);
+        preloader.classList.add('hidden');
       });
 
     // Prepare waypoints and rotations
@@ -380,7 +429,7 @@ export const generateExportedHTML = (
         if (activeAudios[url].source) {
           activeAudios[url].source.stop();
         }
-activeAudios[url].source = audioContext.createBufferSource();
+        activeAudios[url].source = audioContext.createBufferSource();
         activeAudios[url].source.buffer = activeAudios[url].buffer;
         activeAudios[url].source.connect(audioContext.destination);
         activeAudios[url].source.loop = true;

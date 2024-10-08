@@ -19,6 +19,7 @@ import WaypointVisualizer from './components/WaypointVisualizer';
 import HotspotManager from "./components/HotspotManager";
 import { Hotspot } from "./components/HotspotManager";
 import ExportPopup from "./components/ExportPopup";
+import Preloader from "./components/Preloader";
 
 // Define default settings
 const DEFAULT_SETTINGS = {
@@ -129,6 +130,9 @@ const App: React.FC = () => {
   const [infoPopupText, setInfoPopupText] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [showExportPopup, setShowExportPopup] = useState(false);
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSplatLoading, setIsSplatLoading] = useState<boolean>(false);
 
   const sceneRef = useRef<BABYLON.Scene | null>(null);
   const cameraRef = useRef<BABYLON.UniversalCamera | null>(null);
@@ -274,7 +278,8 @@ const App: React.FC = () => {
       reader.readAsText(file);
     }
   };
-  
+
+
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -284,6 +289,11 @@ const App: React.FC = () => {
     sceneRef.current = scene;
 
     scene.clearColor = BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
+
+    // Simulate initial loading
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 250); // Adjust this time as needed
 
     if (navigator.xr) {
       navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
@@ -604,6 +614,7 @@ const newPosition = BABYLON.Vector3.Lerp(
   
       console.log("Loading new model: loadedModelUrl: ", loadedModelUrl);
       if (loadedModelUrl && sceneRef.current) {
+        setIsSplatLoading(true);
         try {
           const loadedModels = await loadModelFile(
             loadedModelUrl,
@@ -615,11 +626,12 @@ const newPosition = BABYLON.Vector3.Lerp(
           console.log("Loaded models: ", loadedModels);
           if (loadedModels && Array.isArray(loadedModels)) {
             loadedMeshesRef.current = loadedModels;
-      
           }
         } catch (error) {
           console.error("Error loading model:", error);
           // Optionally, update UI or state to reflect the error
+        } finally {
+          setIsSplatLoading(false);
         }
       }
     };
@@ -829,7 +841,7 @@ const newPosition = BABYLON.Vector3.Lerp(
       >
         Please drag and drop a <br /> .splat, .ply, .gltf, or .glb file to load.
       </div>
-
+      <Preloader isLoading={isLoading || isSplatLoading} />
       <WaypointControls waypoints={waypoints} setWaypoints={setWaypoints} isEditMode={isEditMode} setIsEditMode={setIsEditMode} scene={sceneRef.current ?? undefined}/>
       <Controls />
       <ParameterControls
