@@ -377,6 +377,7 @@ export const generateExportedHTML = (
 
     // Function to play audio
     function playAudio(url) {
+    console.log('playing audio:', url);
       const audio = new Audio(url);
       audio.loop = true;
       audio.play().catch(error => console.error('Error playing audio:', error));
@@ -549,8 +550,8 @@ export const generateExportedHTML = (
       // Update UI
       const scrollPercentage = (scrollPosition / (path.length - 1)) * 100;
       if(${includeScrollControls}){
-      updateScrollUI(scrollPercentage);
-  }
+         updateScrollUI(scrollPercentage);
+      }
 
       if (!userControl && path.length >= 1) {
         const t = scrollPosition / (path.length - 1 || 1);
@@ -623,18 +624,6 @@ export const generateExportedHTML = (
           }
         });
       }
-
-      // Update hotspots visibility and interactivity
-      hotspots.forEach(hotspot => {
-        const sphere = scene.getMeshByName(\`hotspot-\${hotspot.id}\`);
-        if (sphere) {
-          const distance = BABYLON.Vector3.Distance(camera.position, sphere.position);
-          const isVisible = distance <= 5; // Adjust this value to change visibility distance
-          sphere.isVisible = isVisible;
-          sphere.isPickable = isVisible;
-        }
-      });
-
       scene.render();
     });
 
