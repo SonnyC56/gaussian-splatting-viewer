@@ -31,23 +31,19 @@ export const generateExportedHTML = (
   <meta charset="UTF-8">
   <title>Exported Scene</title>
   <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; }
+    body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; }
     #renderCanvas { width: 100%; height: 100%; touch-action: none; }
-    ${
-      includeUI
-        ? `
     .ui-overlay {
       position: absolute;
       top: 10px;
       left: 10px;
       background-color: rgba(0,0,0,0.7);
-      padding: 10px;
-      border-radius: 5px;
+      padding: 15px;
+      border-radius: 10px;
       color: white;
       z-index: 10;
-    }
-    `
-        : ""
+      font-size: 14px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     #hotspotContent {
       position: fixed;
@@ -59,6 +55,7 @@ export const generateExportedHTML = (
       max-width: 300px;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
       display: none;
+      font-size: 14px;
     }
     #infoPopup {
       position: fixed;
@@ -73,6 +70,62 @@ export const generateExportedHTML = (
       max-width: 80%;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
       display: none;
+      font-size: 16px;
+    }
+    #scrollControls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 10px;
+      color: white;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    #scrollPercentage {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    #progressBarContainer {
+      width: 200px;
+      height: 10px;
+      background-color: rgba(255,255,255,0.3);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    #progressBar {
+      width: 0%;
+      height: 100%;
+      background-color: #4CAF50;
+      transition: width 0.3s ease;
+    }
+    .button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    .button:hover {
+      background-color: #45a049;
+    }
+    #scrollButtons {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
     }
   </style>
 </head>
@@ -82,14 +135,26 @@ export const generateExportedHTML = (
     includeUI
       ? `
   <div class="ui-overlay">
-    <p>Use W/A/S/D to move, mouse to look around.</p>
-    <p>Scroll to move along the path.</p>
+    <p><strong>Controls:</strong></p>
+    <p>• W/A/S/D: Move camera</p>
+    <p>• Mouse: Look around</p>
+    <p>• Scroll: Move along path</p>
   </div>
   `
       : ""
   }
   <div id="hotspotContent"></div>
   <div id="infoPopup"></div>
+  <div id="scrollControls">
+    <div id="scrollPercentage">0%</div>
+    <div id="progressBarContainer">
+      <div id="progressBar"></div>
+    </div>
+    <div id="scrollButtons">
+      <button class="button" onclick="adjustScroll(-1)">◀ Backward</button>
+      <button class="button" onclick="adjustScroll(1)">Forward ▶</button>
+    </div>
+  </div>
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -335,6 +400,29 @@ export const generateExportedHTML = (
       infoPopup.style.display = 'none';
     }
 
+    // Function to update scroll percentage and progress bar
+    function updateScrollUI(percentage) {
+      const scrollPercentage = document.getElementById('scrollPercentage');
+      const progressBar = document.getElementById('progressBar');
+      scrollPercentage.textContent = \`\${Math.round(percentage)}%\`;
+      progressBar.style.width = \`\${percentage}%\`;
+    }
+
+    // Function to adjust scroll
+    function adjustScroll(direction) {
+      const increment = 10;
+      const pathLength = path.length;
+      if (pathLength > 1) {
+        const scrollIncrement = (pathLength - 1) * (increment / 100) * direction;
+        scrollTarget += scrollIncrement;
+
+        if (scrollTarget < 0) scrollTarget = 0;
+        if (scrollTarget > path.length - 1) scrollTarget = path.length - 1;
+
+        userControl = false;
+      }
+    }
+
     // Handle scroll events
     window.addEventListener('wheel', (event) => {
       if (animatingToPath) return;
@@ -455,6 +543,10 @@ export const generateExportedHTML = (
       // Clamp scroll position
       scrollPosition = Math.max(0, Math.min(scrollPosition, path.length - 1));
 
+      // Update UI
+      const scrollPercentage = (scrollPosition / (path.length - 1)) * 100;
+      updateScrollUI(scrollPercentage);
+
       if (!userControl && path.length >= 1) {
         const t = scrollPosition / (path.length - 1 || 1);
 
@@ -526,6 +618,18 @@ export const generateExportedHTML = (
           }
         });
       }
+
+      // Update hotspots visibility and interactivity
+      hotspots.forEach(hotspot => {
+        const sphere = scene.getMeshByName(\`hotspot-\${hotspot.id}\`);
+        if (sphere) {
+          const distance = BABYLON.Vector3.Distance(camera.position, sphere.position);
+          const isVisible = distance <= 5; // Adjust this value to change visibility distance
+          sphere.isVisible = isVisible;
+          sphere.isPickable = isVisible;
+        }
+      });
+
       scene.render();
     });
 
