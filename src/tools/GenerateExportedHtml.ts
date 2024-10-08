@@ -132,6 +132,18 @@ export const generateExportedHTML = (
       width: 100%;
     }
     ` : ''}
+    #muteButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0,0,0,0.7);
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -158,6 +170,7 @@ export const generateExportedHTML = (
     </div>
   </div>
   ` : ''}
+  <button id="muteButton">🔇 Unmute</button>
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -184,7 +197,7 @@ export const generateExportedHTML = (
 
     // Adjust camera sensitivity
     camera.speed = ${cameraMovementSpeed};
-    camera.angularSensibility = ${cameraRotationSensitivity};
+    camera.angularSensitivity = ${cameraRotationSensitivity};
 
     // Initialize rotationQuaternion with the first waypoint's rotation
     camera.rotationQuaternion = new BABYLON.Quaternion(
@@ -345,6 +358,56 @@ export const generateExportedHTML = (
       element.style.top = \`\${top}px\`;
     }
 
+    // Audio context and mute state
+    let audioContext;
+    let isMuted = true;
+    const activeAudios = {};
+
+    // Initialize audio context
+    function initAudioContext() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Function to play audio
+    function playAudio(url) {
+      if (isMuted) return;
+
+      if (!audioContext) {
+        initAudioContext();
+      }
+
+      if (activeAudios[url]) {
+        if (activeAudios[url].source) {
+          activeAudios[url].source.stop();
+        }
+activeAudios[url].source = audioContext.createBufferSource();
+        activeAudios[url].source.buffer = activeAudios[url].buffer;
+        activeAudios[url].source.connect(audioContext.destination);
+        activeAudios[url].source.loop = true;
+        activeAudios[url].source.start();
+      } else {
+        fetch(url)
+          .then(response => response.arrayBuffer())
+          .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+          .then(audioBuffer => {
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.loop = true;
+            source.start();
+            activeAudios[url] = { source: source, buffer: audioBuffer };
+          })
+          .catch(error => console.error('Error loading audio:', error));
+      }
+    }
+
+    // Function to stop audio
+    function stopAudio(url) {
+      if (activeAudios[url] && activeAudios[url].source) {
+        activeAudios[url].source.stop();
+      }
+    }
+
     // Function to execute interactions
     const executeInteractions = (interactions) => {
       interactions.forEach((interaction) => {
@@ -375,19 +438,6 @@ export const generateExportedHTML = (
       });
     };
 
-    // Function to play audio
-    function playAudio(url) {
-    console.log('playing audio:', url);
-      const audio = new Audio(url);
-      audio.loop = true;
-      audio.play().catch(error => console.error('Error playing audio:', error));
-    }
-
-    // Function to stop audio
-    function stopAudio(url) {
-      // Implement audio stopping logic if needed
-    }
-
     // Function to show info popup
     function showInfoPopup(text) {
       const infoPopup = document.getElementById('infoPopup');
@@ -408,8 +458,10 @@ export const generateExportedHTML = (
     function updateScrollUI(percentage) {
       const scrollPercentage = document.getElementById('scrollPercentage');
       const progressBar = document.getElementById('progressBar');
-      scrollPercentage.textContent = \`\${Math.round(percentage)}%\`;
-      progressBar.style.width = \`\${percentage}%\`;
+      if (scrollPercentage && progressBar) {
+        scrollPercentage.textContent = \`\${Math.round(percentage)}%\`;
+        progressBar.style.width = \`\${percentage}%\`;
+      }
     }
 
     // Function to adjust scroll
@@ -624,6 +676,7 @@ export const generateExportedHTML = (
           }
         });
       }
+
       scene.render();
     });
 
@@ -645,6 +698,34 @@ export const generateExportedHTML = (
       if (camera.rotationQuaternion) {
         camera.rotation = camera.rotationQuaternion.toEulerAngles();
         camera.rotationQuaternion = null;
+      }
+    });
+
+    // Mute button functionality
+    const muteButton = document.getElementById('muteButton');
+    muteButton.addEventListener('click', function() {
+      isMuted = !isMuted;
+      muteButton.textContent = isMuted ? '🔇 Unmute' : '🔊 Mute';
+      
+      if (isMuted) {
+        Object.values(activeAudios).forEach(audio => {
+          if (audio.source) {
+            audio.source.stop();
+          }
+        });
+      } else {
+        // Reinitialize audio context if it was not created before
+        if (!audioContext) {
+          initAudioContext();
+        }
+        // Replay active audios
+        activeWaypoints.forEach(index => {
+          waypoints[index].interactions.forEach(interaction => {
+            if (interaction.type === 'audio') {
+              playAudio(interaction.data.url);
+            }
+          });
+        });
       }
     });
 
