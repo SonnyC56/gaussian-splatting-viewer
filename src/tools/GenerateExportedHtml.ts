@@ -148,11 +148,12 @@ export const generateExportedHTML = (
 
     // Prepare waypoints and rotations
     const waypoints = ${JSON.stringify(waypoints)};
+    console.log('waypoints: ', waypoints);
     const controlPoints = waypoints.map(
       (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
     );
     const rotations = waypoints.map(
-      (wp) => new BABYLON.Quaternion(wp.rotation.x, wp.rotation.y, wp.rotation.z, wp.rotation.w).normalize()
+      (wp) => new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w).normalize()
     );
 
     let path = [];
