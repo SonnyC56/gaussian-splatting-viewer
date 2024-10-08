@@ -18,6 +18,7 @@ import { wheelHandler } from "./tools/WheelHandler";
 import WaypointVisualizer from './components/WaypointVisualizer';
 import HotspotManager from "./components/HotspotManager";
 import { Hotspot } from "./components/HotspotManager";
+import ExportPopup from "./components/ExportPopup";
 
 // Define default settings
 const DEFAULT_SETTINGS = {
@@ -127,6 +128,7 @@ const App: React.FC = () => {
   const [isModelLocal, setIsModelLocal] = useState<boolean>(false);
   const [infoPopupText, setInfoPopupText] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [showExportPopup, setShowExportPopup] = useState(false);
 
   const sceneRef = useRef<BABYLON.Scene | null>(null);
   const cameraRef = useRef<BABYLON.UniversalCamera | null>(null);
@@ -671,26 +673,22 @@ const newPosition = BABYLON.Vector3.Lerp(
     }
   }, [backgroundColor]);
 
-  const handleExport = async () => {
-    let modelUrl = loadedModelUrl || customModelUrl;
+  const handleExport = () => {
+    setShowExportPopup(true);
+  };
+
+  const handleExportConfirm = (modelUrl: string, includeScrollControls: boolean, includeMovementInstructions: boolean) => {
+    let exportModelUrl = loadedModelUrl || customModelUrl;
 
     if (isModelLocal) {
-      modelUrl =
-        prompt("Please provide a URL where the model is hosted:", "") ?? "";
-      if (!modelUrl) {
-        alert("Export cancelled. You must provide a URL for the model.");
-        return;
-      }
+      exportModelUrl = modelUrl;
     }
 
-    const includeUI = window.confirm(
-      "Do you want to include the controls UI in the exported HTML?"
-    );
-
     const htmlContent = generateExportedHTML(
-      modelUrl,
-      includeUI,
-      waypointsRef.current,
+      exportModelUrl,
+      includeScrollControls,
+      includeMovementInstructions,
+      waypoints,
       backgroundColor,
       cameraMovementSpeed,
       cameraRotationSensitivity,
@@ -707,6 +705,8 @@ const newPosition = BABYLON.Vector3.Lerp(
     a.download = "exported_scene.html";
     a.click();
     URL.revokeObjectURL(url);
+
+    setShowExportPopup(false);
   };
 
   const executeInteractions = (interactions: Interaction[], scene: BABYLON.Scene) => {
@@ -875,7 +875,13 @@ const newPosition = BABYLON.Vector3.Lerp(
         <HotspotManager scene={sceneRef.current} camera={cameraRef.current}       hotspots={hotspots}
         setHotspots={setHotspots} />
       )}
-
+    {showExportPopup && (
+        <ExportPopup
+          onExport={handleExportConfirm}
+          onCancel={() => setShowExportPopup(false)}
+          isModelLocal={isModelLocal}
+        />
+      )}
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100%", touchAction: "none" }}

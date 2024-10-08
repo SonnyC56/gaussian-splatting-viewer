@@ -1,6 +1,7 @@
 export const generateExportedHTML = (
   modelUrl: string,
-  includeUI: boolean,
+  includeScrollControls: boolean,
+  includeMovementInstructions: boolean,
   waypoints: Array<{
     x: number;
     y: number;
@@ -15,8 +16,8 @@ export const generateExportedHTML = (
   animationFrames: number,
   hotspots: Array<{
     id: string;
-    position: { x: number; y: number; z: number };
-    scale: { x: number; y: number; z: number };
+    position: { _x: number; _y: number; _z: number };
+    scale: { _x: number; _y: number; _z: number };
     title: string;
     information?: string;
     photoUrl?: string;
@@ -33,6 +34,7 @@ export const generateExportedHTML = (
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; }
     #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+    ${includeMovementInstructions ? `
     .ui-overlay {
       position: absolute;
       top: 10px;
@@ -45,6 +47,7 @@ export const generateExportedHTML = (
       font-size: 14px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+    ` : ''}
     #hotspotContent {
       position: fixed;
       background-color: rgba(0, 0, 0, 0.8);
@@ -72,6 +75,7 @@ export const generateExportedHTML = (
       display: none;
       font-size: 16px;
     }
+    ${includeScrollControls ? `
     #scrollControls {
       position: absolute;
       bottom: 20px;
@@ -127,24 +131,22 @@ export const generateExportedHTML = (
       justify-content: space-between;
       width: 100%;
     }
+    ` : ''}
   </style>
 </head>
 <body>
   <canvas id="renderCanvas"></canvas>
-  ${
-    includeUI
-      ? `
+  ${includeMovementInstructions ? `
   <div class="ui-overlay">
     <p><strong>Controls:</strong></p>
     <p>• W/A/S/D: Move camera</p>
     <p>• Mouse: Look around</p>
     <p>• Scroll: Move along path</p>
   </div>
-  `
-      : ""
-  }
+  ` : ''}
   <div id="hotspotContent"></div>
   <div id="infoPopup"></div>
+  ${includeScrollControls ? `
   <div id="scrollControls">
     <div id="scrollPercentage">0%</div>
     <div id="progressBarContainer">
@@ -155,6 +157,7 @@ export const generateExportedHTML = (
       <button class="button" onclick="adjustScroll(1)">Forward ▶</button>
     </div>
   </div>
+  ` : ''}
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -545,7 +548,9 @@ export const generateExportedHTML = (
 
       // Update UI
       const scrollPercentage = (scrollPosition / (path.length - 1)) * 100;
+      if(${includeScrollControls}){
       updateScrollUI(scrollPercentage);
+  }
 
       if (!userControl && path.length >= 1) {
         const t = scrollPosition / (path.length - 1 || 1);
