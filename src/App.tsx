@@ -141,6 +141,7 @@ const App: React.FC = () => {
   const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
   const activeWaypointsRef = useRef<Set<number>>(new Set());
   const targetRotationRef = useRef<BABYLON.Quaternion>(waypoints[0].rotation.clone());
+  const waypointsRef = useRef<Waypoint[]>(waypoints);
 
 
   const resetSettings = () => {
@@ -445,6 +446,8 @@ const App: React.FC = () => {
         const scene = sceneRef.current;
         const camera = cameraRef.current;
         
+      //  console.log("ROTATIONS:: RenderLoop: rotationsRef.current :",  rotationsRef.current)
+
         // Update scroll position smoothly
         const scrollInterpolationSpeed = 0.1;
         scrollPositionRef.current +=
@@ -457,6 +460,7 @@ const App: React.FC = () => {
           Math.min(scrollPositionRef.current, pathRef.current.length - 1)
         );
         
+
         // Update scroll percentage
         const newScrollPercentage =
           pathRef.current.length > 1
@@ -466,25 +470,30 @@ const App: React.FC = () => {
         
         if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
           const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
-          const totalSegments = waypoints.length - 1;
+          const totalSegments = waypointsRef.current.length - 1;
+          console.log("ROTATIONS:: RenderLoop: waypoints: ", waypointsRef.current.length);
           
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
             const segmentIndex = Math.floor(segmentT);
             const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
             const lerpFactor = segmentT - clampedSegmentIndex;
+
+          //  console.log("ROTATIONS:: clampled segment index: ", clampedSegmentIndex, " segmentT: ", segmentT, " t: ", t, " totalSegments: ", totalSegments );
             
             const r1 = rotationsRef.current[clampedSegmentIndex];
             const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
+
+         //   console.log("ROTATIONS:: RenderLoop: r1 :",  r1._x, " r2: ", r2._x, )
             
+
             // Calculate the target rotation using Slerp
             const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
             targetRotationRef.current = targetRotation;
           } else if (rotationsRef.current.length === 1) {
             targetRotationRef.current = rotationsRef.current[0].clone();
           }
-      
-        
+
         // Smoothly interpolate the camera's rotation towards the target rotation
         if (camera.rotationQuaternion) {
           camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
@@ -651,7 +660,7 @@ const newPosition = BABYLON.Vector3.Lerp(
     rotationsRef.current = rotations;
     console.log("waypints changed, rotationsRef:", rotationsRef.current);
 
-
+    waypointsRef.current = waypoints;
 
   }, [waypoints]);
 
