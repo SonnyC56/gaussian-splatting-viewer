@@ -60,6 +60,20 @@ export const generateExportedHTML = (
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
       display: none;
     }
+    #infoPopup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 1002;
+      max-width: 80%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -75,6 +89,7 @@ export const generateExportedHTML = (
       : ""
   }
   <div id="hotspotContent"></div>
+  <div id="infoPopup"></div>
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -148,7 +163,6 @@ export const generateExportedHTML = (
 
     // Prepare waypoints and rotations
     const waypoints = ${JSON.stringify(waypoints)};
-    console.log('waypoints: ', waypoints);
     const controlPoints = waypoints.map(
       (wp) => new BABYLON.Vector3(wp.x, wp.y, wp.z)
     );
@@ -172,7 +186,6 @@ export const generateExportedHTML = (
     // Create hotspots
     const hotspots = ${JSON.stringify(hotspots)};
     console.log(hotspots);
-    // Add inspector 
 
     hotspots.forEach(hotspot => {
       // Assign default scale if necessary
@@ -268,6 +281,9 @@ export const generateExportedHTML = (
     const executeInteractions = (interactions) => {
       interactions.forEach((interaction) => {
         switch (interaction.type) {
+          case "audio":
+            playAudio(interaction.data.url);
+            break;
           case "info":
             showInfoPopup(interaction.data.text);
             break;
@@ -280,6 +296,9 @@ export const generateExportedHTML = (
     const reverseInteractions = (interactions) => {
       interactions.forEach((interaction) => {
         switch (interaction.type) {
+          case "audio":
+            stopAudio(interaction.data.url);
+            break;
           case "info":
             hideInfoPopup();
             break;
@@ -288,21 +307,32 @@ export const generateExportedHTML = (
       });
     };
 
+    // Function to play audio
+    function playAudio(url) {
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.play().catch(error => console.error('Error playing audio:', error));
+    }
+
+    // Function to stop audio
+    function stopAudio(url) {
+      // Implement audio stopping logic if needed
+    }
+
     // Function to show info popup
     function showInfoPopup(text) {
-      const hotspotContent = document.getElementById('hotspotContent');
-      hotspotContent.innerHTML = \`
+      const infoPopup = document.getElementById('infoPopup');
+      infoPopup.innerHTML = \`
         <p>\${text}</p>
         <button onclick="hideInfoPopup()" style="width: 100%; padding: 10px; background-color: #4CAF50; border: none; color: white; cursor: pointer; border-radius: 5px;">Close</button>
       \`;
-      hotspotContent.style.display = 'block';
-      positionHotspotContent(hotspotContent);
+      infoPopup.style.display = 'block';
     }
 
     // Function to hide info popup
     function hideInfoPopup() {
-      const hotspotContent = document.getElementById('hotspotContent');
-      hotspotContent.style.display = 'none';
+      const infoPopup = document.getElementById('infoPopup');
+      infoPopup.style.display = 'none';
     }
 
     // Handle scroll events
@@ -414,6 +444,9 @@ export const generateExportedHTML = (
     let targetRotation = camera.rotationQuaternion.clone();
     let targetPosition = camera.position.clone();
 
+    // Active waypoints set
+    const activeWaypoints = new Set();
+
     engine.runRenderLoop(function () {
       // Smoothly interpolate scrollPosition towards scrollTarget
       const scrollInterpolationSpeed = 0.1;
@@ -454,46 +487,46 @@ export const generateExportedHTML = (
           targetRotation = rotations[0].clone();
           targetPosition = path[0].clone();
         }
-      
 
-      // Smoothly interpolate the camera's rotation towards the target rotation
-      if (camera.rotationQuaternion) {
-        camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
-          camera.rotationQuaternion,
-          targetRotation,
-          0.05 // Damping factor for rotation (adjust between 0 and 1 for smoothness)
-        ).normalize();
-      }
-
-      // Smoothly interpolate the camera's position towards the target position
-      const positionDampingFactor = 0.1; // Adjust between 0 (no movement) and 1 (instant movement)
-      camera.position = BABYLON.Vector3.Lerp(
-        camera.position,
-        targetPosition,
-        positionDampingFactor
-      );
-
-      // Handle interactions based on waypoints
-      waypoints.forEach((wp, index) => {
-        const distance = BABYLON.Vector3.Distance(
-          camera.position,
-          new BABYLON.Vector3(wp.x, wp.y, wp.z)
-        );
-        const triggerDistance = 1.0; // Define a suitable trigger distance
-
-        if (distance <= triggerDistance) {
-          executeInteractions(wp.interactions);
-        } else {
-          reverseInteractions(wp.interactions);
+        // Smoothly interpolate the camera's rotation towards the target rotation
+        if (camera.rotationQuaternion) {
+          camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
+            camera.rotationQuaternion,
+            targetRotation,
+            0.05 // Damping factor for rotation (adjust between 0 and 1 for smoothness)
+          ).normalize();
         }
-      });
-    }
-      scene.render();
-    });
 
-    // Resize
-    window.addEventListener('resize', function () {
-      engine.resize();
+        // Smoothly interpolate the camera's position towards the target position
+        const positionDampingFactor = 0.1; // Adjust between 0 (no movement) and 1 (instant movement)
+        camera.position = BABYLON.Vector3.Lerp(
+          camera.position,
+          targetPosition,
+          positionDampingFactor
+        );
+
+        // Handle interactions based on waypoints
+        waypoints.forEach((wp, index) => {
+          const distance = BABYLON.Vector3.Distance(
+            camera.position,
+            new BABYLON.Vector3(wp.x, wp.y, wp.z)
+          );
+          const triggerDistance = 1.0; // Define a suitable trigger distance
+
+          if (distance <= triggerDistance) {
+            if (!activeWaypoints.has(index)) {
+              activeWaypoints.add(index);
+              executeInteractions(wp.interactions);
+            }
+          } else {
+            if (activeWaypoints.has(index)) {
+              activeWaypoints.delete(index);
+              reverseInteractions(wp.interactions);
+            }
+          }
+        });
+      }
+      scene.render();
     });
 
     // User interaction detection
@@ -515,6 +548,11 @@ export const generateExportedHTML = (
         camera.rotation = camera.rotationQuaternion.toEulerAngles();
         camera.rotationQuaternion = null;
       }
+    });
+
+    // Resize
+    window.addEventListener('resize', function () {
+      engine.resize();
     });
   </script>
 </body>

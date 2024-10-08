@@ -690,7 +690,7 @@ const newPosition = BABYLON.Vector3.Lerp(
     const htmlContent = generateExportedHTML(
       modelUrl,
       includeUI,
-      waypoints,
+      waypointsRef.current,
       backgroundColor,
       cameraMovementSpeed,
       cameraRotationSensitivity,
