@@ -61,7 +61,7 @@ const loadModelFile = async (
     newMeshes.forEach((mesh) => {
       if (mesh instanceof BABYLON.Mesh) {
         mesh.position = BABYLON.Vector3.Zero();
-        addTooltipToMesh(mesh, 'tooltip', scene);
+       // addTooltipToMesh(mesh, 'tooltip', scene);
       }
     });
 

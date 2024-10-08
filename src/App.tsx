@@ -471,7 +471,7 @@ const App: React.FC = () => {
         if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
           const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
           const totalSegments = waypointsRef.current.length - 1;
-          console.log("ROTATIONS:: RenderLoop: waypoints: ", waypointsRef.current.length);
+         // console.log("ROTATIONS:: RenderLoop: waypoints: ", waypointsRef.current.length);
           
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
@@ -521,7 +521,7 @@ const newPosition = BABYLON.Vector3.Lerp(
         camera.position.copyFrom(newPosition);
         
         // Handle interactions based on waypoints
-        waypoints.forEach((wp, index) => {
+        waypointsRef.current.forEach((wp, index) => {
           const distance = BABYLON.Vector3.Distance(
             camera.position,
             new BABYLON.Vector3(wp.x, wp.y, wp.z)
@@ -771,6 +771,7 @@ const newPosition = BABYLON.Vector3.Lerp(
   };
 
   const showInfoInteraction = (data: InfoInteractionData) => {
+    console.log("Showing info:", data.text);
     const infoData = data;
     setInfoPopupText(infoData.text);
   };
