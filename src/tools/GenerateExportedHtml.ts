@@ -31,6 +31,7 @@ export const generateExportedHTML = (
 <head>
   <meta charset="UTF-8">
   <title>Exported Scene</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; }
     #renderCanvas { width: 100%; height: 100%; touch-action: none; }
@@ -318,9 +319,8 @@ export const generateExportedHTML = (
     console.log(hotspots);
 
     hotspots.forEach(hotspot => {
-      // Assign default scale if necessary
       const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
-        ? new BABYLON.Vector3(1, 1, 1) // Default scale
+        ? new BABYLON.Vector3(1, 1, 1) 
         : new BABYLON.Vector3(hotspot.scale._x, hotspot.scale._y, hotspot.scale._z);
 
       const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
@@ -333,7 +333,6 @@ export const generateExportedHTML = (
       material.emissiveColor = BABYLON.Color3.FromHexString(hotspot.color).scale(0.5);
       sphere.material = material;
 
-      // Make sure the hotspot is pickable by the camera
       sphere.isPickable = true;
 
       sphere.actionManager = new BABYLON.ActionManager(scene);
@@ -639,6 +638,15 @@ export const generateExportedHTML = (
 
     // Active waypoints set
     const activeWaypoints = new Set();
+
+    //create floor mesh at  y = 0
+    const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, scene);    
+
+    // WebXR setup
+    const xr = scene.createDefaultXRExperienceAsync({
+      floorMeshes: [ground],
+    });
+
 
     engine.runRenderLoop(function () {
       // Smoothly interpolate scrollPosition towards scrollTarget
