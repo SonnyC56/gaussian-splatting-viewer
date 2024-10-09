@@ -21,7 +21,7 @@ export const generateExportedHTML = (
     title: string;
     information?: string;
     photoUrl?: string;
-    activationMode: 'click' | 'hover';
+    activationMode: "click" | "hover";
     color: string;
   }>
 ) => {
@@ -35,7 +35,9 @@ export const generateExportedHTML = (
   <style>
     body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; }
     #renderCanvas { width: 100%; height: 100%; touch-action: none; }
-    ${includeMovementInstructions ? `
+    ${
+      includeMovementInstructions
+        ? `
     .ui-overlay {
       position: absolute;
       top: 10px;
@@ -48,7 +50,9 @@ export const generateExportedHTML = (
       font-size: 14px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    ` : ''}
+    `
+        : ""
+    }
     #hotspotContent {
       position: fixed;
       background-color: rgba(0, 0, 0, 0.8);
@@ -76,7 +80,9 @@ export const generateExportedHTML = (
       display: none;
       font-size: 16px;
     }
-    ${includeScrollControls ? `
+    ${
+      includeScrollControls
+        ? `
     #scrollControls {
       position: absolute;
       bottom: 20px;
@@ -132,7 +138,9 @@ export const generateExportedHTML = (
       justify-content: space-between;
       width: 100%;
     }
-    ` : ''}
+    `
+        : ""
+    }
     #muteButton {
       position: absolute;
       top: 10px;
@@ -157,7 +165,7 @@ export const generateExportedHTML = (
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      z-index: 9999;
+      z-index: 100000;
       transition: opacity 0.5s ease-out;
     }
 
@@ -186,6 +194,29 @@ export const generateExportedHTML = (
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Start Screen Frosted Glass Effect */
+    #startButtonContainer {
+      position: absolute; 
+      width: 100%; 
+      height: 100%; 
+      background-color: rgba(255, 255, 255, 0.2); 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      z-index: 10000; 
+      backdrop-filter: blur(10px); 
+      -webkit-backdrop-filter: blur(10px);
+    }
+    #startButton {
+      padding: 20px 40px; 
+      font-size: 24px; 
+      background-color: rgba(255, 255, 255, 0.25); 
+      color: white; 
+      border: none; 
+      border-radius: 5px; 
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -193,18 +224,28 @@ export const generateExportedHTML = (
       <h1>Story Splat</h1>
       <div class="spinner"></div>
   </div>
+    <!-- Start Screen -->
+  <div id="startButtonContainer">
+    <button id="startButton">Start Experience</button>
+  </div>
   <canvas id="renderCanvas"></canvas>
-  ${includeMovementInstructions ? `
+  ${
+    includeMovementInstructions
+      ? `
   <div class="ui-overlay">
     <p><strong>Controls:</strong></p>
     <p>• W/A/S/D: Move camera</p>
     <p>• Mouse: Look around</p>
     <p>• Scroll: Move along path</p>
   </div>
-  ` : ''}
+  `
+      : ""
+  }
   <div id="hotspotContent"></div>
   <div id="infoPopup"></div>
-  ${includeScrollControls ? `
+  ${
+    includeScrollControls
+      ? `
   <div id="scrollControls">
     <div id="scrollPercentage">0%</div>
     <div id="progressBarContainer">
@@ -215,8 +256,10 @@ export const generateExportedHTML = (
       <button class="button" onclick="adjustScroll(1)">Forward ▶</button>
     </div>
   </div>
-  ` : ''}
-  <button id="muteButton">🔇 Unmute</button>
+  `
+      : ""
+  }
+  <button id="muteButton">🔊 Mute</button>
   <!-- Babylon.js CDN -->
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -230,6 +273,7 @@ export const generateExportedHTML = (
 
     // Create the scene
     const scene = new BABYLON.Scene(engine);
+    window.scene = scene; // Make scene accessible globally
 
     // Set the background color
     scene.clearColor = BABYLON.Color3.FromHexString('${backgroundColor}').toColor4(1);
@@ -244,7 +288,7 @@ export const generateExportedHTML = (
 
     // Adjust camera sensitivity
     camera.speed = ${cameraMovementSpeed};
-    camera.angularSensitivity = ${cameraRotationSensitivity};
+    camera.angularSensibility = ${cameraRotationSensitivity};
 
     // Initialize rotationQuaternion with the first waypoint's rotation
     camera.rotationQuaternion = new BABYLON.Quaternion(
@@ -274,24 +318,6 @@ export const generateExportedHTML = (
     let scrollPosition = 0;
     let scrollTarget = 0.01; // Start with a small value to enable scrolling
 
-    // Load the model file
-    BABYLON.SceneLoader.ImportMeshAsync('', '', '${modelUrl}', scene)
-      .then((result) => {
-        const loadedMeshes = result.meshes;
-        loadedMeshes.forEach((mesh) => {
-          if (mesh instanceof BABYLON.Mesh) {
-            mesh.position = BABYLON.Vector3.Zero();
-          }
-        });
-        // Hide the preloader after the model is loaded
-        preloader.classList.add('hidden');
-      })
-      .catch((error) => {
-        console.error('Error loading model file:', error);
-        alert('Error loading model file: ' + error.message);
-        preloader.classList.add('hidden');
-      });
-
     // Prepare waypoints and rotations
     const waypoints = ${JSON.stringify(waypoints)};
     const controlPoints = waypoints.map(
@@ -316,7 +342,6 @@ export const generateExportedHTML = (
 
     // Create hotspots
     const hotspots = ${JSON.stringify(hotspots)};
-    console.log(hotspots);
 
     hotspots.forEach(hotspot => {
       const scale = (hotspot.scale._x === 0 && hotspot.scale._y === 0 && hotspot.scale._z === 0)
@@ -326,7 +351,6 @@ export const generateExportedHTML = (
       const sphere = BABYLON.MeshBuilder.CreateSphere(\`hotspot-\${hotspot.id}\`, { diameter: 0.2 }, scene);
       sphere.position = new BABYLON.Vector3(hotspot.position._x, hotspot.position._y, hotspot.position._z);
       sphere.scaling = scale;
-      console.log('created sphere, position:', sphere.position, 'scale:', sphere.scaling);
       
       const material = new BABYLON.StandardMaterial(\`hotspot-material-\${hotspot.id}\`, scene);
       material.diffuseColor = BABYLON.Color3.FromHexString(hotspot.color);
@@ -406,62 +430,84 @@ export const generateExportedHTML = (
       element.style.top = \`\${top}px\`;
     }
 
-    // Audio context and mute state
-    let audioContext;
-    let isMuted = true;
-    const activeAudios = {};
+    // Mute state
+    let isMuted = false;
+    const activeSounds = {};
 
-    // Initialize audio context
-    function initAudioContext() {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+// Updated playAudio function
+function playAudio(interactionData, waypointIndex) {
+  if (isMuted) return;
+
+  const id = interactionData.id;
+  const url = interactionData.url;
+  const data = interactionData;
+
+  // If sound is already playing, do not play it again
+  if (activeSounds[id] && activeSounds[id].isPlaying) {
+    return;
+  }
+
+  if (activeSounds[id]) {
+    // Sound object already exists, play it if not playing
+    if (!activeSounds[id].isPlaying) {
+      activeSounds[id].play();
     }
-
-    // Function to play audio
-    function playAudio(url) {
-      if (isMuted) return;
-
-      if (!audioContext) {
-        initAudioContext();
+  } else {
+    // Create new sound
+    const sound = new BABYLON.Sound(
+      id,
+      url,
+      scene,
+      () => {
+        // Play the sound once it's ready
+        sound.play();
+      },
+      {
+        loop: data.loop !== undefined ? data.loop : true,
+        volume: data.volume !== undefined ? data.volume : 1,
+        spatialSound: data.spatialSound !== undefined ? data.spatialSound : false,
+        distanceModel: data.distanceModel !== undefined ? data.distanceModel : "exponential",
+        maxDistance: data.maxDistance !== undefined ? data.maxDistance : 100,
+        refDistance: data.refDistance !== undefined ? data.refDistance : 1,
+        rolloffFactor: data.rolloffFactor !== undefined ? data.rolloffFactor : 1,
       }
+    );
 
-      if (activeAudios[url]) {
-        if (activeAudios[url].source) {
-          activeAudios[url].source.stop();
-        }
-        activeAudios[url].source = audioContext.createBufferSource();
-        activeAudios[url].source.buffer = activeAudios[url].buffer;
-        activeAudios[url].source.connect(audioContext.destination);
-        activeAudios[url].source.loop = true;
-        activeAudios[url].source.start();
+    activeSounds[id] = sound;
+
+    if (data.spatialSound) {
+      let position;
+      if (waypointIndex !== undefined && waypoints[waypointIndex]) {
+        const waypoint = waypoints[waypointIndex];
+        position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
       } else {
-        fetch(url)
-          .then(response => response.arrayBuffer())
-          .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-          .then(audioBuffer => {
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioContext.destination);
-            source.loop = true;
-            source.start();
-            activeAudios[url] = { source: source, buffer: audioBuffer };
-          })
-          .catch(error => console.error('Error loading audio:', error));
+        position = new BABYLON.Vector3(0, 0, 0); // Default position if waypoint is undefined
       }
-    }
 
-    // Function to stop audio
-    function stopAudio(url) {
-      if (activeAudios[url] && activeAudios[url].source) {
-        activeAudios[url].source.stop();
-      }
+      sound.setPosition(position);
+      // No need to attach the sound to the camera
     }
+  }
+}
+
+// Updated stopAudio function
+function stopAudio(interactionData) {
+  const id = interactionData.id;
+  const sound = activeSounds[id];
+  if (sound && sound.isPlaying) {
+    sound.stop();
+  }
+  // Remove the sound from activeSounds to clean up
+  delete activeSounds[id];
+}
+
 
     // Function to execute interactions
-    const executeInteractions = (interactions) => {
+    const executeInteractions = (interactions, waypointIndex) => {
       interactions.forEach((interaction) => {
         switch (interaction.type) {
           case "audio":
-            playAudio(interaction.data.url);
+            playAudio({ ...interaction.data, id: interaction.id }, waypointIndex);
             break;
           case "info":
             showInfoPopup(interaction.data.text);
@@ -476,7 +522,10 @@ export const generateExportedHTML = (
       interactions.forEach((interaction) => {
         switch (interaction.type) {
           case "audio":
-            stopAudio(interaction.data.url);
+            const data = interaction.data;
+            if (!data.spatialSound && data.stopOnExit) {
+              stopAudio({ ...data, id: interaction.id });
+            }
             break;
           case "info":
             hideInfoPopup();
@@ -639,15 +688,34 @@ export const generateExportedHTML = (
     // Active waypoints set
     const activeWaypoints = new Set();
 
-    //create floor mesh at  y = 0
+    // Create floor mesh at y = 0 and hide it
     const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, scene);    
+    ground.isVisible = false;
 
     // WebXR setup
     const xr = scene.createDefaultXRExperienceAsync({
       floorMeshes: [ground],
     });
 
+    // Load the model file
+    BABYLON.SceneLoader.ImportMeshAsync('', '', '${modelUrl}', scene)
+      .then((result) => {
+        const loadedMeshes = result.meshes;
+        loadedMeshes.forEach((mesh) => {
+          if (mesh instanceof BABYLON.Mesh) {
+            mesh.position = BABYLON.Vector3.Zero();
+          }
+        });
+        // Hide the preloader after the model is loaded
+        preloader.classList.add('hidden');
+      })
+      .catch((error) => {
+        console.error('Error loading model file:', error);
+        alert('Error loading model file: ' + error.message);
+        preloader.classList.add('hidden');
+      });
 
+    // Start the render loop
     engine.runRenderLoop(function () {
       // Smoothly interpolate scrollPosition towards scrollTarget
       const scrollInterpolationSpeed = 0.1;
@@ -657,7 +725,7 @@ export const generateExportedHTML = (
       scrollPosition = Math.max(0, Math.min(scrollPosition, path.length - 1));
 
       // Update UI
-      const scrollPercentage = (scrollPosition / (path.length - 1)) * 100;
+      const scrollPercentage = (scrollPosition / (path.length - 1 || 1)) * 100;
       if(${includeScrollControls}){
          updateScrollUI(scrollPercentage);
       }
@@ -723,7 +791,7 @@ export const generateExportedHTML = (
           if (distance <= triggerDistance) {
             if (!activeWaypoints.has(index)) {
               activeWaypoints.add(index);
-              executeInteractions(wp.interactions);
+              executeInteractions(wp.interactions, index);
             }
           } else {
             if (activeWaypoints.has(index)) {
@@ -760,30 +828,49 @@ export const generateExportedHTML = (
 
     // Mute button functionality
     const muteButton = document.getElementById('muteButton');
+    muteButton.textContent = isMuted ? '🔇 Unmute' : '🔊 Mute';
     muteButton.addEventListener('click', function() {
       isMuted = !isMuted;
       muteButton.textContent = isMuted ? '🔇 Unmute' : '🔊 Mute';
       
       if (isMuted) {
-        Object.values(activeAudios).forEach(audio => {
-          if (audio.source) {
-            audio.source.stop();
+        // Stop all active sounds
+        Object.values(activeSounds).forEach(sound => {
+          if (sound.isPlaying) {
+            sound.pause();
           }
         });
       } else {
-        // Reinitialize audio context if it was not created before
-        if (!audioContext) {
-          initAudioContext();
-        }
-        // Replay active audios
-        activeWaypoints.forEach(index => {
-          waypoints[index].interactions.forEach(interaction => {
-            if (interaction.type === 'audio') {
-              playAudio(interaction.data.url);
-            }
-          });
+        // Resume sounds that should be playing
+        Object.values(activeSounds).forEach(sound => {
+          if (!sound.isPlaying) {
+            sound.play();
+          }
         });
       }
+    });
+
+    // Start button functionality
+    document.getElementById('startButton').addEventListener('click', function() {
+      // Hide the start button
+      document.getElementById('startButtonContainer').style.display = 'none';
+
+      // Resume audio context if suspended
+      if (BABYLON.Engine.audioEngine.audioContext.state === 'suspended') {
+        BABYLON.Engine.audioEngine.audioContext.resume();
+      }
+
+      // Play audio interactions with autoplay set to true
+      waypoints.forEach((wp, index) => {
+        wp.interactions.forEach((interaction) => {
+          if (interaction.type === 'audio') {
+            const data = interaction.data;
+            if (data.autoplay) {
+              playAudio({ ...data, id: interaction.id }, index);
+            }
+          }
+        });
+      });
     });
 
     // Resize

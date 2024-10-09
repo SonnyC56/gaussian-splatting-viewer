@@ -55,6 +55,7 @@ export interface AudioInteractionData {
   maxDistance?: number;
   refDistance?: number;
   rolloffFactor?: number;
+  stopOnExit?: boolean; // New property for non-spatial sounds
 }
 export interface InfoInteractionData {
   text: string;
@@ -149,9 +150,9 @@ const App: React.FC = () => {
   const rotationsRef = useRef<BABYLON.Quaternion[]>([]);
   const userControlRef = useRef<boolean>(false);
   const animatingToPathRef = useRef<boolean>(false);
-  const activeAudioRefs = useRef<{ [key: string]: BABYLON.Sound }>({});
-
-  const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
+  const activeAudioRefs = useRef<{
+    [key: string]: { sound: BABYLON.Sound; data: AudioInteractionData };
+  }>({});
   const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
   const activeWaypointsRef = useRef<Set<number>>(new Set());
   const targetRotationRef = useRef<BABYLON.Quaternion>(waypoints[0].rotation.clone());
@@ -684,6 +685,19 @@ const newPosition = BABYLON.Vector3.Lerp(
 
     waypointsRef.current = waypoints;
 
+    //if there is any audio with autoplay, play it 
+    waypoints.forEach((wp, index) => {
+      wp.interactions.forEach((interaction) => {
+        if (interaction.type === "audio") {
+          const data = interaction.data as AudioInteractionData;
+          if (data.autoplay) {
+            playAudioInteraction(interaction, index);
+          }
+        }
+      });
+    });
+
+
   }, [waypoints]);
 
   useEffect(() => {
@@ -748,7 +762,11 @@ const newPosition = BABYLON.Vector3.Lerp(
     interactions.forEach((interaction) => {
       switch (interaction.type) {
         case "audio":
-          stopAudioInteraction(interaction);
+          // Only stop non-spatial sounds with stopOnExit enabled
+          const data = interaction.data as AudioInteractionData;
+          if (!data.spatialSound && data.stopOnExit) {
+            stopAudioInteraction(interaction);
+          }
           break;
         case "info":
           hideInfoInteraction();
@@ -759,11 +777,19 @@ const newPosition = BABYLON.Vector3.Lerp(
     });
   };
 
-  const playAudioInteraction = (interaction: Interaction, waypointIndex: number) => {
+  const playAudioInteraction = (
+    interaction: Interaction,
+    waypointIndex: number
+  ) => {
     const data = interaction.data as AudioInteractionData;
     const id = interaction.id;
     const scene = sceneRef.current;
     if (!scene) return;
+  
+    // If the sound is already playing, do not play it again
+    if (activeAudioRefs.current[id]?.sound?.isPlaying) {
+      return;
+    }
   
     const waypoint = waypointsRef.current[waypointIndex];
     const position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
@@ -792,13 +818,14 @@ const newPosition = BABYLON.Vector3.Lerp(
       sound.setPosition(position);
     }
   
-    activeAudioRefs.current[id] = sound;
+    activeAudioRefs.current[id] = { sound, data };
   };
 
   const stopAudioInteraction = (interaction: Interaction) => {
     const id = interaction.id;
-    const sound = activeAudioRefs.current[id];
-    if (sound) {
+    const activeAudio = activeAudioRefs.current[id];
+    if (activeAudio) {
+      const { sound } = activeAudio;
       sound.stop();
       sound.dispose();
       delete activeAudioRefs.current[id];
