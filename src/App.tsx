@@ -47,8 +47,15 @@ export interface Waypoint {
 
 export interface AudioInteractionData {
   url: string;
+  spatialSound: boolean;
+  volume?: number;
+  loop?: boolean;
+  autoplay?: boolean;
+  distanceModel?: "linear" | "exponential";
+  maxDistance?: number;
+  refDistance?: number;
+  rolloffFactor?: number;
 }
-
 export interface InfoInteractionData {
   text: string;
 }
@@ -142,7 +149,8 @@ const App: React.FC = () => {
   const rotationsRef = useRef<BABYLON.Quaternion[]>([]);
   const userControlRef = useRef<boolean>(false);
   const animatingToPathRef = useRef<boolean>(false);
-  const activeAudioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+  const activeAudioRefs = useRef<{ [key: string]: BABYLON.Sound }>({});
+
   const activeAnimationsRef = useRef<{ [key: string]: BABYLON.Animation }>({});
   const loadedMeshesRef = useRef<BABYLON.AbstractMesh[]>([]);
   const activeWaypointsRef = useRef<Set<number>>(new Set());
@@ -539,16 +547,16 @@ const newPosition = BABYLON.Vector3.Lerp(
             new BABYLON.Vector3(wp.x, wp.y, wp.z)
           );
           const triggerDistance = 1.0;
-          
+        
           if (distance <= triggerDistance) {
             if (!activeWaypointsRef.current.has(index)) {
               activeWaypointsRef.current.add(index);
-              executeInteractions(wp.interactions, scene);
+              executeInteractions(wp.interactions, index);
             }
           } else {
             if (activeWaypointsRef.current.has(index)) {
               activeWaypointsRef.current.delete(index);
-              reverseInteractions(wp.interactions, scene);
+              reverseInteractions(wp.interactions);
             }
           }
         });
@@ -721,67 +729,82 @@ const newPosition = BABYLON.Vector3.Lerp(
     setShowExportPopup(false);
   };
 
-  const executeInteractions = (interactions: Interaction[], scene: BABYLON.Scene) => {
+  const executeInteractions = (interactions: Interaction[], waypointIndex: number) => {
     interactions.forEach((interaction) => {
       switch (interaction.type) {
         case "audio":
-          playAudioInteraction(interaction.data as AudioInteractionData);
+          playAudioInteraction(interaction, waypointIndex);
           break;
         case "info":
           showInfoInteraction(interaction.data as InfoInteractionData);
           break;
-        case "animation":
-          triggerAnimationInteraction(
-            interaction.data as AnimationInteractionData,
-            scene
-          );
-          break;
         default:
           console.warn(`Unsupported interaction type: ${interaction.type}`);
       }
     });
   };
 
-  const reverseInteractions = (interactions: Interaction[], scene: BABYLON.Scene) => {
+  const reverseInteractions = (interactions: Interaction[]) => {
     interactions.forEach((interaction) => {
       switch (interaction.type) {
         case "audio":
-          stopAudioInteraction(interaction.id);
+          stopAudioInteraction(interaction);
           break;
         case "info":
           hideInfoInteraction();
           break;
-        case "animation":
-          stopAnimationInteraction(
-            interaction.id,
-            scene
-          );
-          break;
         default:
           console.warn(`Unsupported interaction type: ${interaction.type}`);
       }
     });
   };
 
-  const playAudioInteraction = (data: AudioInteractionData) => {
-    const audioData = data;
-    const audio = new Audio(audioData.url);
-    audio.loop = true;
-    audio.play().catch((error) => {
-      console.error("Error playing audio:", error);
-    });
-    activeAudioRefs.current[audioData.url] = audio;
+  const playAudioInteraction = (interaction: Interaction, waypointIndex: number) => {
+    const data = interaction.data as AudioInteractionData;
+    const id = interaction.id;
+    const scene = sceneRef.current;
+    if (!scene) return;
+  
+    const waypoint = waypointsRef.current[waypointIndex];
+    const position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
+  
+    const sound = new BABYLON.Sound(
+      id,
+      data.url,
+      scene,
+      () => {
+        if (data.autoplay !== false) {
+          sound.play();
+        }
+      },
+      {
+        loop: data.loop ?? true,
+        volume: data.volume ?? 1,
+        spatialSound: data.spatialSound ?? false,
+        distanceModel: data.distanceModel ?? "exponential",
+        maxDistance: data.maxDistance ?? 100,
+        refDistance: data.refDistance ?? 1,
+        rolloffFactor: data.rolloffFactor ?? 1,
+      }
+    );
+  
+    if (data.spatialSound) {
+      sound.setPosition(position);
+    }
+  
+    activeAudioRefs.current[id] = sound;
   };
 
-  const stopAudioInteraction = (id: string) => {
-    const audio = activeAudioRefs.current[id];
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+  const stopAudioInteraction = (interaction: Interaction) => {
+    const id = interaction.id;
+    const sound = activeAudioRefs.current[id];
+    if (sound) {
+      sound.stop();
+      sound.dispose();
       delete activeAudioRefs.current[id];
     }
   };
-
+  
   const showInfoInteraction = (data: InfoInteractionData) => {
     console.log("Showing info:", data.text);
     const infoData = data;
@@ -792,29 +815,6 @@ const newPosition = BABYLON.Vector3.Lerp(
     setInfoPopupText(null);
   };
 
-  const triggerAnimationInteraction = (
-    data: AnimationInteractionData,
-    scene: BABYLON.Scene
-  ) => {
-    const animationData = data;
-    console.log("Triggering animation:", animationData.animationName);
-    const mesh = scene.getMeshByName(animationData.animationName);
-    if (mesh && mesh.animations.length > 0) {
-      mesh.beginAnimation(mesh.animations[0].name, false, 1);
-      activeAnimationsRef.current[animationData.animationName] = mesh.animations[0];
-    }
-  };
-
-  const stopAnimationInteraction = (
-    id: string,
-    scene: BABYLON.Scene
-  ) => {
-    const mesh = scene.getMeshByName(id);
-    if (mesh) {
-      scene.stopAnimation(mesh);
-      delete activeAnimationsRef.current[id];
-    }
-  };
 
   return (
     <div
