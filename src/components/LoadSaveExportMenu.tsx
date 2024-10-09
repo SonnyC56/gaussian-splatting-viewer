@@ -3,6 +3,7 @@ import React from "react";
 import Draggable from "react-draggable";
 import styled from "styled-components";
 import { FiFolder, FiSave, FiUpload, FiDownload, FiTrash2 } from "react-icons/fi"; // Corrected Icon
+import plyToSplat from "../tools/plyToSplat"; // Import the function
 
 // Define the interface for custom props
 interface LoadSaveExportMenuProps {
@@ -148,7 +149,7 @@ const FileInputLabel = styled.label`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
+  width: 91%;
   padding: 8px 12px;
   background-color: #17a2b8;
   color: #ffffff;
@@ -218,51 +219,69 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
   const handleFocus = () => setIsDraggingDisabled(true);
   const handleBlur = () => setIsDraggingDisabled(false);
 
+
+  const handlePlyFileConvert = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if(event.target.files){
+      plyToSplat([event.target.files[0]]); // Pass File array
+    }
+  };
+
   return (
     <Draggable handle=".handle" disabled={isDraggingDisabled}>
       <MenuContainer className="handle" isDraggingDisabled={isDraggingDisabled}>
 
         {/* Load Splats Section */}
-  
-          <SectionTitle>
-            <FiFolder size={18} style={{ marginRight: "8px" }} /> Load Splats
-          </SectionTitle>
-          {models.map((splat, index) => (
-            <Button
-              key={index}
-              variant="secondary"
-              onClick={() => loadModel(baseURL + splat)}
-              onMouseDown={handleFocus}
-              onMouseUp={handleBlur}
-              style={{ padding: "6px 10px" }} // Slightly shorter buttons
-            >
-              {splat}
-            </Button>
-          ))}
 
-          <Input
-            type="text"
-            placeholder="Enter custom splat URL"
-            value={customModelUrl}
-            onChange={(e) => setCustomModelUrl(e.target.value)}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-          />
+        <SectionTitle>
+          <FiFolder size={18} style={{ marginRight: "8px" }} /> Load Splats
+        </SectionTitle>
+        {models.map((splat, index) => (
           <Button
-            variant="success"
-            onClick={() => {
-              if (customModelUrl) {
-                loadModel(customModelUrl);
-              } else {
-                alert("Please enter a valid URL.");
-              }
-            }}
+            key={index}
+            variant="secondary"
+            onClick={() => loadModel(baseURL + splat)}
             onMouseDown={handleFocus}
             onMouseUp={handleBlur}
+            style={{ padding: "6px 10px" }} // Slightly shorter buttons
           >
-            <FiUpload size={18} /> Load Custom Splat
+            {splat}
           </Button>
-   
+        ))}
+
+        <Input
+          type="text"
+          placeholder="Enter custom splat URL"
+          value={customModelUrl}
+          onChange={(e) => setCustomModelUrl(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+        />
+        <Button
+          variant="success"
+          onClick={() => {
+            if (customModelUrl) {
+              loadModel(customModelUrl);
+            } else {
+              alert("Please enter a valid URL.");
+            }
+          }}
+          onMouseDown={handleFocus}
+          onMouseUp={handleBlur}
+        >
+          <FiUpload size={18} /> Load Custom Splat
+        </Button>
+
+        {/* Add PLY to Splat Conversion */}
+        <FileInputLabel htmlFor="ply-to-splat-input">
+          Convert PLY to Splat
+        </FileInputLabel>
+        <HiddenFileInput
+          id="ply-to-splat-input"
+          type="file"
+          accept=".ply"
+          onChange={handlePlyFileConvert}
+        />
+
 
         <HorizontalLine />
 
@@ -302,11 +321,11 @@ const LoadSaveExportMenu: React.FC<LoadSaveExportMenuProps> = ({
         </Section>
 
         {/* Reset Section */}
-      
-          <Button variant="danger" onClick={handleClear}>
-            <FiTrash2 size={18} /> Reset All
-          </Button>
-    
+
+        <Button variant="danger" onClick={handleClear}>
+          <FiTrash2 size={18} /> Reset All
+        </Button>
+
       </MenuContainer>
     </Draggable>
   );

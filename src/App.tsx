@@ -357,19 +357,6 @@ const App: React.FC = () => {
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
     let isComponentMounted = true;
 
-  /*   if (loadedModelUrl) {
-      const loadedMeshes = await loadModelFile(
-        loadedModelUrl,
-        scene,
-        isComponentMounted,
-        setIsModelLocal,
-        infoTextRef
-      );
-      if(loadedMeshes){
-          loadedMeshesRef.current = loadedMeshes;
-      }
-    } */
-
     const preventDefault = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
@@ -466,9 +453,6 @@ const App: React.FC = () => {
       if (isComponentMounted && sceneRef.current && cameraRef.current) {
         const scene = sceneRef.current;
         const camera = cameraRef.current;
-        
-      //  console.log("ROTATIONS:: RenderLoop: rotationsRef.current :",  rotationsRef.current)
-
         // Update scroll position smoothly
         const scrollInterpolationSpeed = 0.1;
         scrollPositionRef.current +=
@@ -492,21 +476,14 @@ const App: React.FC = () => {
         if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
           const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
           const totalSegments = waypointsRef.current.length - 1;
-         // console.log("ROTATIONS:: RenderLoop: waypoints: ", waypointsRef.current.length);
           
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
             const segmentIndex = Math.floor(segmentT);
             const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
             const lerpFactor = segmentT - clampedSegmentIndex;
-
-          //  console.log("ROTATIONS:: clampled segment index: ", clampedSegmentIndex, " segmentT: ", segmentT, " t: ", t, " totalSegments: ", totalSegments );
-            
             const r1 = rotationsRef.current[clampedSegmentIndex];
             const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
-
-         //   console.log("ROTATIONS:: RenderLoop: r1 :",  r1._x, " r2: ", r2._x, )
-            
 
             // Calculate the target rotation using Slerp
             const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
