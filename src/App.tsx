@@ -2,6 +2,10 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as BABYLON from "@babylonjs/core";
 import "@babylonjs/loaders";
+import * as THREE from 'three';
+//@ts-ignore
+import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 import WaypointControls from "./components/WaypointControls";
 import ParameterControls from "./components/ParameterControls";
@@ -158,6 +162,15 @@ const App: React.FC = () => {
   const targetRotationRef = useRef<BABYLON.Quaternion>(waypoints[0].rotation.clone());
   const waypointsRef = useRef<Waypoint[]>(waypoints);
 
+  // NEW: State to handle rendering engine toggle
+  const [useThreeJS, setUseThreeJS] = useState<boolean>(false);
+
+  // References for Three.js
+  const threeSceneRef = useRef<THREE.Scene | null>(null);
+  const threeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const threeRendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const threeControlsRef = useRef<OrbitControls | null>(null);
+  const gsViewerRef = useRef<GaussianSplats3D.Viewer | null>(null);
 
   const resetSettings = () => {
     setScrollSpeed(DEFAULT_SETTINGS.scrollSpeed);
@@ -233,11 +246,11 @@ const App: React.FC = () => {
       loadedModelUrl,
       hotspots, // Include hotspots in the save data
     };
-  
+
     const jsonString = JSON.stringify(saveData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-  
+
     const a = document.createElement("a");
     a.href = url;
     a.download = "scene_save.json";
@@ -252,7 +265,7 @@ const App: React.FC = () => {
       reader.onload = (e) => {
         try {
           const saveData: SaveFile = JSON.parse(e.target?.result as string);
-  
+
           // Reconstruct BABYLON.Vector3 for waypoints
           const reconstructedWaypoints = saveData.waypoints.map(wp => ({
             ...wp,
@@ -265,7 +278,7 @@ const App: React.FC = () => {
             position: new BABYLON.Vector3(h.position._x, h.position._y, h.position._z),
             scale: new BABYLON.Vector3(h.scale._x, h.scale._y, h.scale._z),
           }));
-          
+
           // Update state
           setScrollSpeed(saveData.scrollSpeed);
           setAnimationFrames(saveData.animationFrames);
@@ -277,7 +290,7 @@ const App: React.FC = () => {
           setHotspots(reconstructedHotspots);
           console.log("Reconstructed waypoints:", reconstructedWaypoints);
           console.log("Reconstructed hotspots:", reconstructedHotspots);
-  
+
           // Optionally, reinitialize other scene elements if necessary
         } catch (error) {
           console.error("Error parsing save file:", error);
@@ -288,8 +301,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Store the cleanup functions returned by the initialization functions
+  const babylonCleanupRef = useRef<(() => void) | null>(null);
+  const threeCleanupRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
+  // Function to initialize Babylon.js scene
+  const initializeBabylonJSScene = useCallback(() => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
@@ -329,13 +346,10 @@ const App: React.FC = () => {
     camera.speed = cameraMovementSpeed;
     camera.angularSensibility = cameraRotationSensitivity;
 
-
     // Initialize rotationQuaternion with the first waypoint's rotation
     camera.rotationQuaternion = waypoints[0].rotation.clone();
 
-    // Optionally, set the Euler rotation to match (if needed)
-    // camera.rotation = camera.rotationQuaternion.toEulerAngles();
-
+    // Enable WASD keys for movement
     camera.keysUp.push(87);
     camera.keysDown.push(83);
     camera.keysLeft.push(65);
@@ -357,19 +371,6 @@ const App: React.FC = () => {
     new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
     let isComponentMounted = true;
 
-  /*   if (loadedModelUrl) {
-      const loadedMeshes = await loadModelFile(
-        loadedModelUrl,
-        scene,
-        isComponentMounted,
-        setIsModelLocal,
-        infoTextRef
-      );
-      if(loadedMeshes){
-          loadedMeshesRef.current = loadedMeshes;
-      }
-    } */
-
     const preventDefault = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
@@ -378,13 +379,13 @@ const App: React.FC = () => {
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-    
+
       const files = e.dataTransfer?.files;
-    
+
       if (files && files.length > 0) {
         const file = files[0];
         const ext = file.name.split(".").pop()?.toLowerCase();
-    
+
         if (["splat", "ply", "gltf", "glb"].includes(ext || "")) {
           try {
             const loadedMeshes = await loadModelFile(
@@ -410,7 +411,6 @@ const App: React.FC = () => {
         }
       }
     };
-    
 
     document.addEventListener("dragover", preventDefault, false);
     document.addEventListener("drop", handleDrop, false);
@@ -466,21 +466,18 @@ const App: React.FC = () => {
       if (isComponentMounted && sceneRef.current && cameraRef.current) {
         const scene = sceneRef.current;
         const camera = cameraRef.current;
-        
-      //  console.log("ROTATIONS:: RenderLoop: rotationsRef.current :",  rotationsRef.current)
 
         // Update scroll position smoothly
         const scrollInterpolationSpeed = 0.1;
         scrollPositionRef.current +=
           (scrollTargetRef.current - scrollPositionRef.current) *
           scrollInterpolationSpeed;
-        
+
         // Clamp scroll position
         scrollPositionRef.current = Math.max(
           0,
           Math.min(scrollPositionRef.current, pathRef.current.length - 1)
         );
-        
 
         // Update scroll percentage
         const newScrollPercentage =
@@ -488,25 +485,19 @@ const App: React.FC = () => {
             ? (scrollPositionRef.current / (pathRef.current.length - 1)) * 100
             : 0;
         setScrollPercentage(newScrollPercentage);
-        
+
         if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
           const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
           const totalSegments = waypointsRef.current.length - 1;
-         // console.log("ROTATIONS:: RenderLoop: waypoints: ", waypointsRef.current.length);
-          
+
           if (totalSegments >= 1) {
             const segmentT = t * totalSegments;
             const segmentIndex = Math.floor(segmentT);
             const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
             const lerpFactor = segmentT - clampedSegmentIndex;
 
-          //  console.log("ROTATIONS:: clampled segment index: ", clampedSegmentIndex, " segmentT: ", segmentT, " t: ", t, " totalSegments: ", totalSegments );
-            
             const r1 = rotationsRef.current[clampedSegmentIndex];
             const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
-
-         //   console.log("ROTATIONS:: RenderLoop: r1 :",  r1._x, " r2: ", r2._x, )
-            
 
             // Calculate the target rotation using Slerp
             const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
@@ -515,64 +506,65 @@ const App: React.FC = () => {
             targetRotationRef.current = rotationsRef.current[0].clone();
           }
 
-        // Smoothly interpolate the camera's rotation towards the target rotation
-        if (camera.rotationQuaternion) {
-          camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
-            camera.rotationQuaternion,
-            targetRotationRef.current,
-            0.05 // Damping factor (adjust between 0 and 1 for smoothness)
-          ).normalize();
-        }
-        
-// Calculate the floor and ceil indices based on scrollPositionRef.current
-const floorIndex = Math.floor(scrollPositionRef.current);
-const ceilIndex = Math.min(floorIndex + 1, pathRef.current.length - 1);
-
-// Calculate the interpolation factor (fractional part)
-const lerpFactor = scrollPositionRef.current - floorIndex;
-
-// Interpolate between the two positions
-const newPosition = BABYLON.Vector3.Lerp(
-  pathRef.current[floorIndex],
-  pathRef.current[ceilIndex],
-  lerpFactor
-);
-
-// Update the camera's position
-        camera.position.copyFrom(newPosition);
-        
-        // Handle interactions based on waypoints
-        waypointsRef.current.forEach((wp, index) => {
-          const distance = BABYLON.Vector3.Distance(
-            camera.position,
-            new BABYLON.Vector3(wp.x, wp.y, wp.z)
-          );
-          const triggerDistance = 1.0;
-        
-          if (distance <= triggerDistance) {
-            if (!activeWaypointsRef.current.has(index)) {
-              activeWaypointsRef.current.add(index);
-              executeInteractions(wp.interactions, index);
-            }
-          } else {
-            if (activeWaypointsRef.current.has(index)) {
-              activeWaypointsRef.current.delete(index);
-              reverseInteractions(wp.interactions);
-            }
+          // Smoothly interpolate the camera's rotation towards the target rotation
+          if (camera.rotationQuaternion) {
+            camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
+              camera.rotationQuaternion,
+              targetRotationRef.current,
+              0.05 // Damping factor (adjust between 0 and 1 for smoothness)
+            ).normalize();
           }
-        });
-      }
-        
+
+          // Calculate the floor and ceil indices based on scrollPositionRef.current
+          const floorIndex = Math.floor(scrollPositionRef.current);
+          const ceilIndex = Math.min(floorIndex + 1, pathRef.current.length - 1);
+
+          // Calculate the interpolation factor (fractional part)
+          const lerpFactor = scrollPositionRef.current - floorIndex;
+
+          // Interpolate between the two positions
+          const newPosition = BABYLON.Vector3.Lerp(
+            pathRef.current[floorIndex],
+            pathRef.current[ceilIndex],
+            lerpFactor
+          );
+
+          // Update the camera's position
+          camera.position.copyFrom(newPosition);
+
+          // Handle interactions based on waypoints
+          waypointsRef.current.forEach((wp, index) => {
+            const distance = BABYLON.Vector3.Distance(
+              camera.position,
+              new BABYLON.Vector3(wp.x, wp.y, wp.z)
+            );
+            const triggerDistance = 1.0;
+
+            if (distance <= triggerDistance) {
+              if (!activeWaypointsRef.current.has(index)) {
+                activeWaypointsRef.current.add(index);
+                executeInteractions(wp.interactions, index);
+              }
+            } else {
+              if (activeWaypointsRef.current.has(index)) {
+                activeWaypointsRef.current.delete(index);
+                reverseInteractions(wp.interactions);
+              }
+            }
+          });
+        }
+
         scene.render();
       }
     });
-    
+
     const resizeHandler = () => {
       engine.resize();
     };
     window.addEventListener("resize", resizeHandler);
 
-    return () => {
+    // Return a cleanup function
+    const cleanup = () => {
       isComponentMounted = false;
       document.removeEventListener("dragover", preventDefault, false);
       document.removeEventListener("drop", handleDrop, false);
@@ -586,12 +578,157 @@ const newPosition = BABYLON.Vector3.Lerp(
       canvas.removeEventListener("touchmove", preventCanvasTouchMove);
 
       scene.dispose();
+      engine.stopRenderLoop();
       engine.dispose();
+      sceneRef.current = null;
+      cameraRef.current = null;
     };
-  }, []);
+
+    // Store the cleanup function
+    babylonCleanupRef.current = cleanup;
+
+    return cleanup;
+  }, [backgroundColor, cameraMovementSpeed, cameraRotationSensitivity, waypoints, isEditMode]);
+
+  // Function to initialize Three.js scene with Gaussian Splats 3D
+  const initializeThreeJSScene = useCallback(() => {
+    if (!canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setClearColor(new THREE.Color(backgroundColor));
+
+    // Enable WebXR
+    renderer.xr.enabled = true;
+
+    const scene = new THREE.Scene();
+    threeSceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(
+      65,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      500
+    );
+    camera.position.set(waypoints[0].x, waypoints[0].y, waypoints[0].z);
+    const quaternion = new THREE.Quaternion(
+      waypoints[0].rotation.x,
+      waypoints[0].rotation.y,
+      waypoints[0].rotation.z,
+      waypoints[0].rotation.w
+    );
+    camera.quaternion.copy(quaternion);
+    threeCameraRef.current = camera;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    threeControlsRef.current = controls;
+
+    const viewer = new GaussianSplats3D.Viewer({
+      threeScene: scene,
+      camera: camera,
+      renderer: renderer,
+      useBuiltInControls: false,
+      selfDrivenMode: false,
+      webXRMode: GaussianSplats3D.WebXRMode.VR, // Enable WebXR VR mode
+      sharedMemoryForWorkers: false, // Re-enable SharedArrayBuffer usage
+      gpuAcceleratedSort: false,     // Re-enable GPU-accelerated sort
+    });
+    gsViewerRef.current = viewer;
+
+    const animate = () => {
+      renderer.setAnimationLoop(() => {
+        threeControlsRef.current?.update();
+        gsViewerRef.current?.update();
+        gsViewerRef.current?.render();
+      });
+    };
+
+    const loadModel = async () => {
+      if (loadedModelUrl) {
+        setIsSplatLoading(true);
+        try {
+          await viewer.addSplatScene(loadedModelUrl, {
+            showLoadingUI: true,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0, 1],
+            scale: [1, 1, 1],
+          });
+          setIsSplatLoading(false);
+          animate();
+        } catch (error) {
+          console.error("Error loading model:", error);
+          setIsSplatLoading(false);
+        }
+      } else {
+        setIsSplatLoading(false);
+        animate();
+      }
+    };
+
+    loadModel();
+
+    const resizeHandler = () => {
+      if (threeRendererRef.current && threeCameraRef.current) {
+        threeCameraRef.current.aspect = window.innerWidth / window.innerHeight;
+        threeCameraRef.current.updateProjectionMatrix();
+        threeRendererRef.current.setSize(window.innerWidth, window.innerHeight);
+      }
+    };
+    window.addEventListener("resize", resizeHandler);
+
+    // Return a cleanup function
+    const cleanup = () => {
+      window.removeEventListener("resize", resizeHandler);
+      threeRendererRef.current?.dispose();
+      threeControlsRef.current?.dispose();
+      gsViewerRef.current?.dispose();
+      threeSceneRef.current?.clear();
+      threeSceneRef.current = null;
+      threeCameraRef.current = null;
+      gsViewerRef.current = null;
+      threeRendererRef.current = null;
+      threeControlsRef.current = null;
+    };
+
+    // Store the cleanup function
+    threeCleanupRef.current = cleanup;
+
+    return cleanup;
+  }, [backgroundColor, waypoints, loadedModelUrl]);
+
+  // Effect to initialize the appropriate scene based on useThreeJS
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    if (useThreeJS) {
+      cleanup = initializeThreeJSScene();
+      // Dispose of Babylon.js resources
+      if (babylonCleanupRef.current) {
+        babylonCleanupRef.current();
+        babylonCleanupRef.current = null;
+      }
+    } else {
+      cleanup = initializeBabylonJSScene();
+      // Dispose of Three.js resources
+      if (threeCleanupRef.current) {
+        threeCleanupRef.current();
+        threeCleanupRef.current = null;
+      }
+    }
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [useThreeJS, initializeThreeJSScene, initializeBabylonJSScene]);
 
   const wheelHandlerLocal = useCallback((event: WheelEvent) => {
-    if(cameraRef.current){
+    if (cameraRef.current && !useThreeJS) {
       wheelHandler(
         event,
         animatingToPathRef,
@@ -607,20 +744,28 @@ const newPosition = BABYLON.Vector3.Lerp(
         isEditMode
       );
     }
-  }, [waypoints, animationFrames, scrollSpeed, isEditMode]);
+  }, [waypoints, animationFrames, scrollSpeed, isEditMode, useThreeJS]);
 
   useEffect(() => {
-    window.addEventListener("wheel", wheelHandlerLocal);
-    return () => {
-      window.removeEventListener("wheel", wheelHandlerLocal);
-    };
-  }, [wheelHandlerLocal]);
+    if (!useThreeJS) {
+      window.addEventListener("wheel", wheelHandlerLocal);
+      return () => {
+        window.removeEventListener("wheel", wheelHandlerLocal);
+      };
+    }
+  }, [wheelHandlerLocal, useThreeJS]);
 
   useEffect(() => {
     const loadMeshes = async () => {
+      if (useThreeJS) {
+        // Three.js loading is handled in initializeThreeJSScene
+        return;
+      }
+
+      // Babylon.js model loading
       console.log("Disposing old meshes: ", loadedMeshesRef.current);
       loadedMeshesRef.current?.forEach(mesh => mesh.dispose());
-  
+
       console.log("Loading new model: loadedModelUrl: ", loadedModelUrl);
       if (loadedModelUrl && sceneRef.current) {
         setIsSplatLoading(true);
@@ -644,25 +789,24 @@ const newPosition = BABYLON.Vector3.Lerp(
         }
       }
     };
-  
+
     loadMeshes();
-  }, [loadedModelUrl]);
-  
+  }, [loadedModelUrl, useThreeJS]);
 
   useEffect(() => {
-    if (cameraRef.current) {
+    if (cameraRef.current && !useThreeJS) {
       cameraRef.current.angularSensibility = cameraRotationSensitivity;
     }
-  }, [cameraRotationSensitivity]);
+  }, [cameraRotationSensitivity, useThreeJS]);
 
   useEffect(() => {
-    if (cameraRef.current) {
+    if (cameraRef.current && !useThreeJS) {
       cameraRef.current.speed = cameraMovementSpeed;
     }
-  }, [cameraMovementSpeed]);
+  }, [cameraMovementSpeed, useThreeJS]);
 
   useEffect(() => {
-    if (!sceneRef.current) return;
+    if (!sceneRef.current || useThreeJS) return;
 
     const controlPoints = waypoints.map(wp => new BABYLON.Vector3(wp.x, wp.y, wp.z));
     const rotations = waypoints.map(wp => new BABYLON.Quaternion(wp.rotation._x, wp.rotation._y, wp.rotation._z, wp.rotation._w));
@@ -681,11 +825,11 @@ const newPosition = BABYLON.Vector3.Lerp(
 
     pathRef.current = path;
     rotationsRef.current = rotations;
-    console.log("waypints changed, rotationsRef:", rotationsRef.current);
+    console.log("waypoints changed, rotationsRef:", rotationsRef.current);
 
     waypointsRef.current = waypoints;
 
-    //if there is any audio with autoplay, play it 
+    //if there is any audio with autoplay, play it
     waypoints.forEach((wp, index) => {
       wp.interactions.forEach((interaction) => {
         if (interaction.type === "audio") {
@@ -697,15 +841,17 @@ const newPosition = BABYLON.Vector3.Lerp(
       });
     });
 
-
-  }, [waypoints]);
+  }, [waypoints, useThreeJS]);
 
   useEffect(() => {
-    if (sceneRef.current) {
+    if (sceneRef.current && !useThreeJS) {
       sceneRef.current.clearColor =
         BABYLON.Color3.FromHexString(backgroundColor).toColor4(1);
     }
-  }, [backgroundColor]);
+    if (threeRendererRef.current && useThreeJS) {
+      threeRendererRef.current.setClearColor(new THREE.Color(backgroundColor));
+    }
+  }, [backgroundColor, useThreeJS]);
 
   const handleExport = () => {
     setShowExportPopup(true);
@@ -785,15 +931,15 @@ const newPosition = BABYLON.Vector3.Lerp(
     const id = interaction.id;
     const scene = sceneRef.current;
     if (!scene) return;
-  
+
     // If the sound is already playing, do not play it again
     if (activeAudioRefs.current[id]?.sound?.isPlaying) {
       return;
     }
-  
+
     const waypoint = waypointsRef.current[waypointIndex];
     const position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
-  
+
     const sound = new BABYLON.Sound(
       id,
       data.url,
@@ -813,11 +959,11 @@ const newPosition = BABYLON.Vector3.Lerp(
         rolloffFactor: data.rolloffFactor ?? 1,
       }
     );
-  
+
     if (data.spatialSound) {
       sound.setPosition(position);
     }
-  
+
     activeAudioRefs.current[id] = { sound, data };
   };
 
@@ -831,7 +977,7 @@ const newPosition = BABYLON.Vector3.Lerp(
       delete activeAudioRefs.current[id];
     }
   };
-  
+
   const showInfoInteraction = (data: InfoInteractionData) => {
     console.log("Showing info:", data.text);
     const infoData = data;
@@ -841,7 +987,6 @@ const newPosition = BABYLON.Vector3.Lerp(
   const hideInfoInteraction = () => {
     setInfoPopupText(null);
   };
-
 
   return (
     <div
@@ -901,20 +1046,20 @@ const newPosition = BABYLON.Vector3.Lerp(
       />
       <GitHubLink repoUrl="https://github.com/SonnyC56/gaussian-splatting-viewer" />
 
-      {sceneRef.current && (
+      {!useThreeJS && sceneRef.current && (
         <WaypointVisualizer
           scene={sceneRef.current}
           waypoints={waypoints}
           setWaypoints={setWaypoints}
           isEditMode={isEditMode}
-         />
-       )}
+        />
+      )}
 
-      {sceneRef.current && cameraRef.current && (
-        <HotspotManager scene={sceneRef.current} camera={cameraRef.current}       hotspots={hotspots}
+      {!useThreeJS && sceneRef.current && cameraRef.current && (
+        <HotspotManager scene={sceneRef.current} camera={cameraRef.current} hotspots={hotspots}
         setHotspots={setHotspots} />
       )}
-    {showExportPopup && (
+      {showExportPopup && (
         <ExportPopup
           onExport={handleExportConfirm}
           onCancel={() => setShowExportPopup(false)}
@@ -932,6 +1077,25 @@ const newPosition = BABYLON.Vector3.Lerp(
           onClose={() => setInfoPopupText(null)}
         />
       )}
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => setUseThreeJS(!useThreeJS)}
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          zIndex: 1000,
+          padding: "10px",
+          backgroundColor: "#4CAF50",
+          color: "white",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer",
+        }}
+      >
+        {useThreeJS ? "Switch to Babylon.js" : "Switch to Three.js"}
+      </button>
     </div>
   );
 };
