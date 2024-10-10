@@ -23,7 +23,9 @@ export const generateExportedHTML = (
     photoUrl?: string;
     activationMode: "click" | "hover";
     color: string;
-  }>
+  }>,
+  cameraConstraintMode: "auto" | "path" = "auto",
+  freeFlyEnabled: boolean = false
 ) => {
   return `
 <!DOCTYPE html>
@@ -217,17 +219,55 @@ export const generateExportedHTML = (
       border-radius: 5px; 
       cursor: pointer;
     }
+    ${
+      includeMovementInstructions
+        ? `
+    .ui-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 10px;
+      color: white;
+      z-index: 10;
+      font-size: 14px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    `
+        : ""
+    }
+
+    /* Ensure the toggleFreeFly button has consistent styling */
+    #toggleFreeFly {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    #toggleFreeFly:hover {
+      background-color: #45a049;
+    }
+      
   </style>
 </head>
 <body>
-<div id="preloader">
-      <h1>Story Splat</h1>
-      <div class="spinner"></div>
-  </div>
-    <!-- Start Screen -->
-  <div id="startButtonContainer">
-    <button id="startButton">Start Experience</button>
-  </div>
+  <div id="preloader">
+        <h1>Story Splat</h1>
+        <div class="spinner"></div>
+    </div>
+      <!-- Start Screen -->
+    <div id="startButtonContainer">
+      <button id="startButton">Start Experience</button>
+    </div>
   <canvas id="renderCanvas"></canvas>
   ${
     includeMovementInstructions
@@ -255,6 +295,9 @@ export const generateExportedHTML = (
       <button class="button" onclick="adjustScroll(-1)">◀ Backward</button>
       <button class="button" onclick="adjustScroll(1)">Forward ▶</button>
     </div>
+    <div>
+      ${cameraConstraintMode === "path" ? `<button id="toggleFreeFly" onclick="toggleFreeFly()">Free Fly: ${freeFlyEnabled ? "On" : "Off"}</button>` : ""}
+    </div>
   </div>
   `
       : ""
@@ -264,6 +307,30 @@ export const generateExportedHTML = (
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script>
+    // Initialize freeFlyEnabled based on the parameter
+    let freeFlyEnabled = ${freeFlyEnabled};
+
+    // Function to toggle Free Fly mode
+    function toggleFreeFly() {
+      freeFlyEnabled = !freeFlyEnabled;
+      const toggleButton = document.getElementById('toggleFreeFly');
+      if (toggleButton) {
+        toggleButton.textContent = 'Free Fly: ' + (freeFlyEnabled ? 'On' : 'Off');
+      }
+      // Additional logic to handle Free Fly mode
+      // For example, enabling/disabling certain camera constraints
+      if (${JSON.stringify(cameraConstraintMode)} === "path") {
+        if (freeFlyEnabled) {
+          // Enable free fly controls
+          userControl = true;
+        } else {
+          // Disable free fly controls and revert to path constraints
+          userControl = false;
+        }
+      }
+      console.log('Free Fly Enabled:', freeFlyEnabled);
+    }
+
     const preloader = document.getElementById('preloader');
     // Get the canvas element
     const canvas = document.getElementById('renderCanvas');
@@ -434,73 +501,72 @@ export const generateExportedHTML = (
     let isMuted = false;
     const activeSounds = {};
 
-// Updated playAudio function
-function playAudio(interactionData, waypointIndex) {
-  if (isMuted) return;
+    // Updated playAudio function
+    function playAudio(interactionData, waypointIndex) {
+      if (isMuted) return;
 
-  const id = interactionData.id;
-  const url = interactionData.url;
-  const data = interactionData;
+      const id = interactionData.id;
+      const url = interactionData.url;
+      const data = interactionData;
 
-  // If sound is already playing, do not play it again
-  if (activeSounds[id] && activeSounds[id].isPlaying) {
-    return;
-  }
-
-  if (activeSounds[id]) {
-    // Sound object already exists, play it if not playing
-    if (!activeSounds[id].isPlaying) {
-      activeSounds[id].play();
-    }
-  } else {
-    // Create new sound
-    const sound = new BABYLON.Sound(
-      id,
-      url,
-      scene,
-      () => {
-        // Play the sound once it's ready
-        sound.play();
-      },
-      {
-        loop: data.loop !== undefined ? data.loop : true,
-        volume: data.volume !== undefined ? data.volume : 1,
-        spatialSound: data.spatialSound !== undefined ? data.spatialSound : false,
-        distanceModel: data.distanceModel !== undefined ? data.distanceModel : "exponential",
-        maxDistance: data.maxDistance !== undefined ? data.maxDistance : 100,
-        refDistance: data.refDistance !== undefined ? data.refDistance : 1,
-        rolloffFactor: data.rolloffFactor !== undefined ? data.rolloffFactor : 1,
+      // If sound is already playing, do not play it again
+      if (activeSounds[id] && activeSounds[id].isPlaying) {
+        return;
       }
-    );
 
-    activeSounds[id] = sound;
-
-    if (data.spatialSound) {
-      let position;
-      if (waypointIndex !== undefined && waypoints[waypointIndex]) {
-        const waypoint = waypoints[waypointIndex];
-        position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
+      if (activeSounds[id]) {
+        // Sound object already exists, play it if not playing
+        if (!activeSounds[id].isPlaying) {
+          activeSounds[id].play();
+        }
       } else {
-        position = new BABYLON.Vector3(0, 0, 0); // Default position if waypoint is undefined
+        // Create new sound
+        const sound = new BABYLON.Sound(
+          id,
+          url,
+          scene,
+          () => {
+            // Play the sound once it's ready
+            sound.play();
+          },
+          {
+            loop: data.loop !== undefined ? data.loop : true,
+            volume: data.volume !== undefined ? data.volume : 1,
+            spatialSound: data.spatialSound !== undefined ? data.spatialSound : false,
+            distanceModel: data.distanceModel !== undefined ? data.distanceModel : "exponential",
+            maxDistance: data.maxDistance !== undefined ? data.maxDistance : 100,
+            refDistance: data.refDistance !== undefined ? data.refDistance : 1,
+            rolloffFactor: data.rolloffFactor !== undefined ? data.rolloffFactor : 1,
+          }
+        );
+
+        activeSounds[id] = sound;
+
+        if (data.spatialSound) {
+          let position;
+          if (waypointIndex !== undefined && waypoints[waypointIndex]) {
+            const waypoint = waypoints[waypointIndex];
+            position = new BABYLON.Vector3(waypoint.x, waypoint.y, waypoint.z);
+          } else {
+            position = new BABYLON.Vector3(0, 0, 0); // Default position if waypoint is undefined
+          }
+
+          sound.setPosition(position);
+          // No need to attach the sound to the camera
+        }
       }
-
-      sound.setPosition(position);
-      // No need to attach the sound to the camera
     }
-  }
-}
 
-// Updated stopAudio function
-function stopAudio(interactionData) {
-  const id = interactionData.id;
-  const sound = activeSounds[id];
-  if (sound && sound.isPlaying) {
-    sound.stop();
-  }
-  // Remove the sound from activeSounds to clean up
-  delete activeSounds[id];
-}
-
+    // Updated stopAudio function
+    function stopAudio(interactionData) {
+      const id = interactionData.id;
+      const sound = activeSounds[id];
+      if (sound && sound.isPlaying) {
+        sound.stop();
+      }
+      // Remove the sound from activeSounds to clean up
+      delete activeSounds[id];
+    }
 
     // Function to execute interactions
     const executeInteractions = (interactions, waypointIndex) => {
@@ -563,6 +629,10 @@ function stopAudio(interactionData) {
 
     // Function to adjust scroll
     function adjustScroll(direction) {
+      // Prevent scroll adjustment when Free Fly is enabled in path mode
+      if (${JSON.stringify(cameraConstraintMode)} === "path" && freeFlyEnabled) {
+        return;
+      }
       const increment = 10;
       const pathLength = path.length;
       if (pathLength > 1) {
@@ -580,7 +650,10 @@ function stopAudio(interactionData) {
     window.addEventListener('wheel', (event) => {
       if (animatingToPath) return;
 
-      if (userControl) {
+      if (
+        (${JSON.stringify(cameraConstraintMode)} === "auto" && userControl) ||
+        (${JSON.stringify(cameraConstraintMode)} === "path" && !freeFlyEnabled && userControl)
+      ) {
         animatingToPath = true;
         userControl = false;
 
@@ -658,10 +731,13 @@ function stopAudio(interactionData) {
           scrollTarget = scrollPosition;
         });
       } else {
-        scrollTarget += event.deltaY * ${scrollSpeed};
+        // Prevent updating scroll when Free Fly is enabled in path mode
+        if (!(${JSON.stringify(cameraConstraintMode)} === "path" && freeFlyEnabled)) {
+          scrollTarget += event.deltaY * ${scrollSpeed};
 
-        if (scrollTarget < 0) scrollTarget = 0;
-        if (scrollTarget > path.length - 1) scrollTarget = path.length - 1;
+          if (scrollTarget < 0) scrollTarget = 0;
+          if (scrollTarget > path.length - 1) scrollTarget = path.length - 1;
+        }
       }
     });
 
@@ -724,13 +800,23 @@ function stopAudio(interactionData) {
       // Clamp scroll position
       scrollPosition = Math.max(0, Math.min(scrollPosition, path.length - 1));
 
-      // Update UI
+      // Calculate scroll percentage
       const scrollPercentage = (scrollPosition / (path.length - 1 || 1)) * 100;
-      if(${includeScrollControls}){
-         updateScrollUI(scrollPercentage);
+
+      // Update UI only if not in Free Fly mode
+      if (!(${JSON.stringify(cameraConstraintMode)} === "path" && freeFlyEnabled)) {
+        ${includeScrollControls ? `updateScrollUI(scrollPercentage);` : ""}
       }
 
-      if (!userControl && path.length >= 1) {
+      // Determine if camera should follow the path
+      if (
+        (
+          ${JSON.stringify(cameraConstraintMode)} === "auto" && !userControl
+        ) ||
+        (
+          ${JSON.stringify(cameraConstraintMode)} === "path" && !freeFlyEnabled && !userControl
+        )
+      ) {
         const t = scrollPosition / (path.length - 1 || 1);
 
         const totalSegments = waypoints.length - 1;
@@ -808,22 +894,21 @@ function stopAudio(interactionData) {
     // User interaction detection
     scene.onPointerObservable.add(function (evt) {
       if (evt.type === BABYLON.PointerEventTypes.POINTERDOWN) {
-        userControl = true;
-
-        if (camera.rotationQuaternion) {
-          camera.rotation = camera.rotationQuaternion.toEulerAngles();
-          camera.rotationQuaternion = null;
+        if (${JSON.stringify(cameraConstraintMode)} === "auto" ||  (${JSON.stringify(cameraConstraintMode)} === "path" && freeFlyEnabled)) {
+          userControl = true;
+        } else {
+          userControl = false;
         }
       }
     });
 
     window.addEventListener('keydown', function () {
-      userControl = true;
-
-      if (camera.rotationQuaternion) {
-        camera.rotation = camera.rotationQuaternion.toEulerAngles();
-        camera.rotationQuaternion = null;
+      if (${JSON.stringify(cameraConstraintMode)} === "auto" ||  (${JSON.stringify(cameraConstraintMode)} === "path" && freeFlyEnabled)) {
+        userControl = true;
+      } else {
+        userControl = false;
       }
+
     });
 
     // Mute button functionality

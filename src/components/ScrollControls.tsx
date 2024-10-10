@@ -2,18 +2,20 @@
 import React, { useState } from "react";
 import Draggable from "react-draggable";
 import styled from "styled-components";
-import { FiChevronUp, FiChevronDown, FiArrowLeft, FiArrowRight } from "react-icons/fi";
+import { FiArrowLeft, FiArrowRight } from "react-icons/fi";
 
-// Define the interface for custom props (Removed showScrollControls and setShowScrollControls)
 interface ScrollControlsProps {
   scrollPercentage: number;
   adjustScroll: (direction: number) => void;
   showScrollControls: boolean;
   setShowScrollControls: React.Dispatch<React.SetStateAction<boolean>>;
+  cameraConstraintMode: 'auto' | 'path' ;
+  setCameraConstraintMode: React.Dispatch<React.SetStateAction<'auto' | 'path' >>;
+  freeFlyEnabled: boolean;
+  setFreeFlyEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // Styled Components
-
 const Handle = styled.div<{ isDraggingDisabled: boolean }>`
   position: absolute;
   top: 10px;
@@ -59,7 +61,8 @@ const ToggleButton = styled.button`
   align-items: center;
   outline: none;
   transition: color 0.3s ease;
-
+    width: 100%;
+    justify-content: center;
   &:hover {
     color: #ffa500; /* Orange on hover */
   }
@@ -74,6 +77,7 @@ const ControlRow = styled.div`
   align-items: center;
   margin-bottom: 10px; /* Reduced margin */
   justify-content: space-between;
+  width: 100%;
 `;
 
 const PercentageText = styled.p`
@@ -124,62 +128,77 @@ const ScrollControls: React.FC<ScrollControlsProps> = ({
   adjustScroll,
   showScrollControls,
   setShowScrollControls,
+  cameraConstraintMode,
+  setCameraConstraintMode,
+  freeFlyEnabled,
+  setFreeFlyEnabled,
 }) => {
 
-  // State to manage draggable behavior
   const [isDraggingDisabled, setIsDraggingDisabled] = useState<boolean>(false);
-
-  // Handlers to disable dragging when interacting with buttons
   const handleMouseDown = () => setIsDraggingDisabled(true);
   const handleMouseUp = () => setIsDraggingDisabled(false);
   const handleTouchStart = () => setIsDraggingDisabled(true);
   const handleTouchEnd = () => setIsDraggingDisabled(false);
 
+  const toggleCameraConstraint = () => {
+    setCameraConstraintMode(cameraConstraintMode === 'path' ? 'auto' : 'path');
+    setFreeFlyEnabled(false);
+  };
+
+  const toggleFreeFly = () => {
+    setFreeFlyEnabled(!freeFlyEnabled);
+  };
+
   return (
     <>
-    {showScrollControls && (
-    <Draggable handle=".handle" disabled={isDraggingDisabled}>
-      <Handle className="handle" isDraggingDisabled={isDraggingDisabled}>
-      
-          <ControlsContainer>
-            {/* Scroll Percentage Visualization */}
-            <PercentageText>Scroll Position: {Math.round(scrollPercentage)}%</PercentageText>
-            <ProgressBarContainer>
-              <ProgressBar percentage={scrollPercentage} />
-            </ProgressBarContainer>
+      {showScrollControls && (
+        <Draggable handle=".handle" disabled={isDraggingDisabled}>
+          <Handle className="handle" isDraggingDisabled={isDraggingDisabled}>
+            <ControlsContainer>
+              <PercentageText>Scroll Position: {Math.round(scrollPercentage)}%</PercentageText>
+              <ProgressBarContainer>
+                <ProgressBar percentage={scrollPercentage} />
+              </ProgressBarContainer>
 
-            {/* Scroll Adjustment Buttons */}
-            <ControlRow>
-              <Button
-                onMouseDown={handleMouseDown}
-                onMouseUp={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-                onClick={() => adjustScroll(-1)}
-                aria-label="Scroll Backward"
-              >
-                <FiArrowLeft style={{ marginRight: "4px" }} />
-                Backward
-              </Button>
-              <Button
-                onMouseDown={handleMouseDown}
-                onMouseUp={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-                onClick={() => adjustScroll(1)}
-                aria-label="Scroll Forward"
-              >
-                Forward
-                <FiArrowRight style={{ marginLeft: "4px" }} />
-              </Button>
-            </ControlRow>
-          </ControlsContainer>
-      
-      </Handle>
-    </Draggable>
-    
-    )}
-  </>
+              <ControlRow>
+                <Button
+                  onMouseDown={handleMouseDown}
+                  onMouseUp={handleMouseUp}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  onClick={() => adjustScroll(-1)}
+                  aria-label="Scroll Backward"
+                >
+                  <FiArrowLeft style={{ marginRight: "4px" }} />
+                  Backward
+                </Button>
+                <Button
+                  onMouseDown={handleMouseDown}
+                  onMouseUp={handleMouseUp}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  onClick={() => adjustScroll(1)}
+                  aria-label="Scroll Forward"
+                >
+                  Forward
+                  <FiArrowRight style={{ marginLeft: "4px" }} />
+                </Button>
+              </ControlRow>
+              <ControlRow>
+                <ToggleButton onClick={toggleCameraConstraint}>
+                  Camera Constraint: {cameraConstraintMode === 'path' ? 'Path' : 'Auto'}
+                </ToggleButton>
+                {cameraConstraintMode === 'path' && (
+                  <ToggleButton onClick={toggleFreeFly}>
+                    Free Fly: {freeFlyEnabled ? 'On' : 'Off'}
+                  </ToggleButton>
+                )}
+              </ControlRow>
+            </ControlsContainer>
+          </Handle>
+        </Draggable>
+      )}
+    </>
   );
 };
 

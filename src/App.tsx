@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as BABYLON from "@babylonjs/core";
 import "@babylonjs/loaders";
@@ -138,6 +137,13 @@ const App: React.FC = () => {
   const [infoPopupText, setInfoPopupText] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [showExportPopup, setShowExportPopup] = useState(false);
+
+  const cameraConstraintModeRef = useRef<'auto' | 'path' >('auto');
+  const freeFlyEnabledRef = useRef(false);
+
+  const [cameraConstraintMode, setCameraConstraintMode] = useState<'auto' | 'path' >('path');
+  const [freeFlyEnabled, setFreeFlyEnabled] = useState(false);
+
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSplatLoading, setIsSplatLoading] = useState<boolean>(false);
@@ -427,12 +433,20 @@ const App: React.FC = () => {
 
     const pointerObservable = scene.onPointerObservable.add(function (evt) {
       if (evt.type === BABYLON.PointerEventTypes.POINTERDOWN) {
-        userControlRef.current = true;
+        if(cameraConstraintModeRef.current === 'auto' || (cameraConstraintModeRef.current === 'path' && freeFlyEnabledRef.current)){
+            userControlRef.current = true;
+        } else {
+          userControlRef.current = false;
+        }
       }
     });
 
     const keydownHandlerInternal = () => {
-      userControlRef.current = true;
+      if(cameraConstraintModeRef.current === 'auto' || (cameraConstraintModeRef.current === 'path' && freeFlyEnabledRef.current)){
+        userControlRef.current = true;
+    } else {
+      userControlRef.current = false;
+    }
     };
     window.addEventListener("keydown", keydownHandlerInternal);
 
@@ -449,100 +463,111 @@ const App: React.FC = () => {
       passive: false,
     });
 
-    engine.runRenderLoop(function () {
-      if (isComponentMounted && sceneRef.current && cameraRef.current) {
-        const scene = sceneRef.current;
-        const camera = cameraRef.current;
-        // Update scroll position smoothly
-        const scrollInterpolationSpeed = 0.1;
-        scrollPositionRef.current +=
-          (scrollTargetRef.current - scrollPositionRef.current) *
-          scrollInterpolationSpeed;
-        
-        // Clamp scroll position
-        scrollPositionRef.current = Math.max(
-          0,
-          Math.min(scrollPositionRef.current, pathRef.current.length - 1)
-        );
-        
+// Inside your App component's render loop useEffect
 
-        // Update scroll percentage
-        const newScrollPercentage =
-          pathRef.current.length > 1
-            ? (scrollPositionRef.current / (pathRef.current.length - 1)) * 100
-            : 0;
-        setScrollPercentage(newScrollPercentage);
-        
-        if (!userControlRef.current && pathRef.current.length >= 1 && !isEditMode) {
-          const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
-          const totalSegments = waypointsRef.current.length - 1;
-          
-          if (totalSegments >= 1) {
-            const segmentT = t * totalSegments;
-            const segmentIndex = Math.floor(segmentT);
-            const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
-            const lerpFactor = segmentT - clampedSegmentIndex;
-            const r1 = rotationsRef.current[clampedSegmentIndex];
-            const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
+engine.runRenderLoop(function () {
+  if (isComponentMounted && sceneRef.current && cameraRef.current) {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    // Update scroll position smoothly
+    const scrollInterpolationSpeed = 0.1;
+    scrollPositionRef.current +=
+      (scrollTargetRef.current - scrollPositionRef.current) *
+      scrollInterpolationSpeed;
 
-            // Calculate the target rotation using Slerp
-            const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor);
-            targetRotationRef.current = targetRotation;
-          } else if (rotationsRef.current.length === 1) {
-            targetRotationRef.current = rotationsRef.current[0].clone();
-          }
+    // Clamp scroll position
+    scrollPositionRef.current = Math.max(
+      0,
+      Math.min(scrollPositionRef.current, pathRef.current.length - 1)
+    );
+
+    // Update scroll percentage based on the exact scroll position
+    const newScrollPercentage =
+      pathRef.current.length > 1
+        ? (scrollPositionRef.current / (pathRef.current.length - 1)) * 100
+        : 0;
+    setScrollPercentage(newScrollPercentage);
+
+    if (
+      (!userControlRef.current &&
+        pathRef.current.length >= 1 &&
+        !isEditMode &&
+        cameraConstraintMode === 'path' &&
+        !freeFlyEnabled)
+    ) {
+      // Camera position and rotation are handled via scrollPositionRef.current
+      const t = scrollPositionRef.current / (pathRef.current.length - 1 || 1);
+      const totalSegments = waypointsRef.current.length - 1;
+
+      if (totalSegments >= 1) {
+        const segmentT = t * totalSegments;
+        const segmentIndex = Math.floor(segmentT);
+        const clampedSegmentIndex = Math.min(segmentIndex, totalSegments - 1);
+        const lerpFactor = segmentT - clampedSegmentIndex;
+        const r1 = rotationsRef.current[clampedSegmentIndex];
+        const r2 = rotationsRef.current[clampedSegmentIndex + 1] || rotationsRef.current[rotationsRef.current.length - 1];
+
+        // Calculate the target rotation using Slerp
+        const targetRotation = BABYLON.Quaternion.Slerp(r1, r2, lerpFactor).normalize();
+        targetRotationRef.current = targetRotation;
 
         // Smoothly interpolate the camera's rotation towards the target rotation
         if (camera.rotationQuaternion) {
           camera.rotationQuaternion = BABYLON.Quaternion.Slerp(
             camera.rotationQuaternion,
             targetRotationRef.current,
-            0.05 // Damping factor (adjust between 0 and 1 for smoothness)
+            0.05 // Damping factor for rotation (adjust between 0 and 1 for smoothness)
           ).normalize();
         }
-        
-// Calculate the floor and ceil indices based on scrollPositionRef.current
-const floorIndex = Math.floor(scrollPositionRef.current);
-const ceilIndex = Math.min(floorIndex + 1, pathRef.current.length - 1);
 
-// Calculate the interpolation factor (fractional part)
-const lerpFactor = scrollPositionRef.current - floorIndex;
+        // Calculate the interpolated position
+        const floorIndex = Math.floor(scrollPositionRef.current);
+        const ceilIndex = Math.min(floorIndex + 1, pathRef.current.length - 1);
+        const lerpFactorPos = scrollPositionRef.current - floorIndex;
 
-// Interpolate between the two positions
-const newPosition = BABYLON.Vector3.Lerp(
-  pathRef.current[floorIndex],
-  pathRef.current[ceilIndex],
-  lerpFactor
-);
+        const interpolatedPosition = BABYLON.Vector3.Lerp(
+          pathRef.current[floorIndex],
+          pathRef.current[ceilIndex],
+          lerpFactorPos
+        );
 
-// Update the camera's position
-        camera.position.copyFrom(newPosition);
-        
-        // Handle interactions based on waypoints
-        waypointsRef.current.forEach((wp, index) => {
-          const distance = BABYLON.Vector3.Distance(
-            camera.position,
-            new BABYLON.Vector3(wp.x, wp.y, wp.z)
-          );
-          const triggerDistance = 1.0;
-        
-          if (distance <= triggerDistance) {
-            if (!activeWaypointsRef.current.has(index)) {
-              activeWaypointsRef.current.add(index);
-              executeInteractions(wp.interactions, index);
-            }
-          } else {
-            if (activeWaypointsRef.current.has(index)) {
-              activeWaypointsRef.current.delete(index);
-              reverseInteractions(wp.interactions);
-            }
+        // Smoothly interpolate the camera's position towards the interpolated position
+        const positionDampingFactor = 0.1; // Adjust between 0 (no movement) and 1 (instant movement)
+        camera.position = BABYLON.Vector3.Lerp(
+          camera.position,
+          interpolatedPosition,
+          positionDampingFactor
+        );
+      } else if (rotationsRef.current.length === 1) {
+        targetRotationRef.current = rotationsRef.current[0].clone();
+      }
+
+      // Handle interactions based on waypoints
+      waypointsRef.current.forEach((wp, index) => {
+        const distance = BABYLON.Vector3.Distance(
+          camera.position,
+          new BABYLON.Vector3(wp.x, wp.y, wp.z)
+        );
+        const triggerDistance = 1.0; // Define a suitable trigger distance
+
+        if (distance <= triggerDistance) {
+          if (!activeWaypointsRef.current.has(index)) {
+            activeWaypointsRef.current.add(index);
+            executeInteractions(wp.interactions, index);
           }
-        });
-      }
-        
-        scene.render();
-      }
-    });
+        } else {
+          if (activeWaypointsRef.current.has(index)) {
+            activeWaypointsRef.current.delete(index);
+            reverseInteractions(wp.interactions);
+          }
+        }
+      });
+    }
+
+    scene.render();
+  }
+});
+
     
     const resizeHandler = () => {
       engine.resize();
@@ -568,7 +593,7 @@ const newPosition = BABYLON.Vector3.Lerp(
   }, []);
 
   const wheelHandlerLocal = useCallback((event: WheelEvent) => {
-    if(cameraRef.current){
+    if (cameraRef.current) {
       wheelHandler(
         event,
         animatingToPathRef,
@@ -581,10 +606,26 @@ const newPosition = BABYLON.Vector3.Lerp(
         scrollSpeed,
         scrollTargetRef,
         scrollPositionRef,
-        isEditMode
+        isEditMode,
+        cameraConstraintModeRef.current, // Use ref for cameraConstraintMode
+        freeFlyEnabledRef.current,     // Use ref for freeFlyEnabled
+        () => { } // Dummy function for setFreeFlyEnabled - ref handles updates
       );
     }
   }, [waypoints, animationFrames, scrollSpeed, isEditMode]);
+
+  useEffect(() => {
+    cameraConstraintModeRef.current = cameraConstraintMode;
+    freeFlyEnabledRef.current = freeFlyEnabled;
+
+    if (cameraConstraintMode === 'path') {
+      if(!freeFlyEnabled){
+        userControlRef.current = false;
+      }
+    }
+
+
+  }, [cameraConstraintMode, freeFlyEnabled]);
 
   useEffect(() => {
     window.addEventListener("wheel", wheelHandlerLocal);
@@ -705,7 +746,9 @@ const newPosition = BABYLON.Vector3.Lerp(
       cameraRotationSensitivity,
       scrollSpeed,
       animationFrames,
-      hotspots
+      hotspots,
+      cameraConstraintMode,
+      freeFlyEnabled
     );
 
     const blob = new Blob([htmlContent], { type: "text/html" });
@@ -865,6 +908,10 @@ const newPosition = BABYLON.Vector3.Lerp(
         adjustScroll={adjustScroll}
         showScrollControls={showScrollControls}
         setShowScrollControls={setShowScrollControls}
+        cameraConstraintMode={cameraConstraintMode}
+        setCameraConstraintMode={setCameraConstraintMode}
+        freeFlyEnabled={freeFlyEnabled}
+        setFreeFlyEnabled={setFreeFlyEnabled}
       />
       <LoadSaveExportMenu
         setLoadedModelUrl={setLoadedModelUrl}
